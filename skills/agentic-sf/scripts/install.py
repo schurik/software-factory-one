@@ -14,9 +14,6 @@ that harness's `.env.sample`, the justfile, and the .gitignore entries. Existing
 skipped unless --force. ONE FILE IS NEVER OVERWRITTEN even then: factory.yaml
 is the operator's; under --force a changed render lands beside it as `.new`.
 
-The trace db defaults to the same file sssf uses, so a repository that runs
-both factories sees every run in one visualizer.
-
 Stdlib only: this runs under `uv run` with no dependencies.
 """
 
@@ -36,7 +33,6 @@ HARNESSES = TEMPLATES / "harnesses"
 
 GITIGNORE_ENTRIES = [
     "asf/data/",
-    "adws/adw_data/sssf.db*",
     ".env",
     ".asf-worktrees/",
     "__pycache__/",
@@ -125,7 +121,7 @@ JUSTFILE_MARK = "# agentic-sf recipes."
 
 def stamp_justfile(root: Path, force: bool, stamped: list, skipped: list) -> str:
     """`justfile` when the repo has none or ours; `asf.justfile` beside a
-    foreign one (sssf stamps a justfile too, and its recipe names collide)."""
+    foreign one — a repository's own recipes are not the factory's to overwrite."""
     target = root / "justfile"
     if target.exists() and not target.read_text().startswith(JUSTFILE_MARK):
         target = root / "asf.justfile"

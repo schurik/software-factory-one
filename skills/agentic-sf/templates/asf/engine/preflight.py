@@ -43,7 +43,7 @@ import subprocess
 from pathlib import Path
 
 from . import git_helper, harnesses
-from .data_types import AgentConfig, Finding, SSSFConfig
+from .data_types import AgentConfig, Finding, FactoryConfig
 from .utils import anchor
 
 # The trace UI's two ports, mirrored from scripts/up.py — checked here so
@@ -53,7 +53,7 @@ API_PORT = int(os.environ.get("PORT", "4600"))
 
 # ── git: the tree a run cuts from ────────────────────────────────────────────
 
-def repo(cfg: SSSFConfig, main_root: Path) -> list[Finding]:
+def repo(cfg: FactoryConfig, main_root: Path) -> list[Finding]:
     """Whether this checkout can do what the config says runs will do.
 
     None of it is fatal on its own — `worktree.ensure()` falls back to running
@@ -105,7 +105,7 @@ def repo(cfg: SSSFConfig, main_root: Path) -> list[Finding]:
 
 # ── runtime: where the record is written ─────────────────────────────────────
 
-def runtime(cfg: SSSFConfig, main_root: Path) -> list[Finding]:
+def runtime(cfg: FactoryConfig, main_root: Path) -> list[Finding]:
     """Whether the session's own directory, and the trace mirror, can be written.
 
     Anchored to the MAIN checkout, exactly as `session.ensure` anchors them, so
@@ -162,7 +162,7 @@ def credentials(agent: AgentConfig) -> list[Finding]:
     return list(ask(agent)) if ask else []
 
 
-def roster(cfg: SSSFConfig) -> list[Finding]:
+def roster(cfg: FactoryConfig) -> list[Finding]:
     """Every agent in the config: is its harness there, and can it authenticate."""
     findings: list[Finding] = []
     for name in sorted({agent.harness for agent in cfg.agents}):
@@ -240,7 +240,7 @@ def _gh_version(binary: str) -> tuple[int, ...]:
     return (int(found.group(1)), int(found.group(2))) if found else ()
 
 
-def forge(cfg: SSSFConfig) -> list[Finding]:
+def forge(cfg: FactoryConfig) -> list[Finding]:
     """Whether the CLI each enabled forge path needs is on PATH, and can label.
 
     Only asked about the paths this repository actually turned on. A repo that
@@ -328,7 +328,7 @@ def port_free(port: int) -> bool:
 
 
 def trace_ui() -> list[Finding]:
-    """Whether `just obs` could start sssf's visualizer over the shared db."""
+    """Whether `just obs` could start the trace UI over the trace db."""
     if not shutil.which("bun"):
         return [Finding(check="trace UI", level="warn",
                         detail="bun is not on PATH — `just obs` cannot start the trace UI",
@@ -344,7 +344,7 @@ def trace_ui() -> list[Finding]:
 
 # ── composition ──────────────────────────────────────────────────────────────
 
-def before_run(cfg: SSSFConfig, main_root: Path | None = None) -> list[Finding]:
+def before_run(cfg: FactoryConfig, main_root: Path | None = None) -> list[Finding]:
     """The subset every run is worth paying for. Raises SystemExit on a fatal.
 
     Deliberately small and deliberately fast: git questions the run is about to
@@ -363,7 +363,7 @@ def before_run(cfg: SSSFConfig, main_root: Path | None = None) -> list[Finding]:
     return [finding for finding in findings if finding.level == "warn"]
 
 
-def everything(cfg: SSSFConfig, main_root: Path | None = None) -> list[Finding]:
+def everything(cfg: FactoryConfig, main_root: Path | None = None) -> list[Finding]:
     """Every check there is, ordered the way an engineer would read them."""
     root = Path(main_root) if main_root else git_helper.main_root()
     return (repo(cfg, root) + runtime(cfg, root) + roster(cfg) + quality(root)

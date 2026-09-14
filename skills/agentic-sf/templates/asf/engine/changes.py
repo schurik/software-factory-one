@@ -25,7 +25,7 @@ def resolve_base(cwd, ref: str) -> BaseRef:
     """Pick the commit the work is measured from, and record why that one.
 
     Every question is asked of `cwd` — the run's worktree, not the process's
-    working directory. On a `sssf/<adw_id>` branch that is what makes the
+    working directory. On a `asf/<adw_id>` branch that is what makes the
     cascade below still mean what it says: `merge-base` returns the commit the
     worktree was cut from, so "HEAD is ahead of main" reads the run's own
     commits and never the engineer's.

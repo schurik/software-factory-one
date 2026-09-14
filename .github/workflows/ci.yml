@@ -175,3 +175,14 @@ jobs:
             echo "::error::the install staged its own runtime — check GITIGNORE_ENTRIES"
             exit 1
           fi
+
+      # The inverse, through uv as well: stdlib only, and it must leave the
+      # scratch repo the way it found it — plus its own untouched .gitignore-less state.
+      - name: Uninstall leaves nothing of the factory behind
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP/asf-scratch"
+          uv run "$GITHUB_WORKSPACE/skills/agentic-sf/scripts/uninstall.py" --dry-run
+          uv run "$GITHUB_WORKSPACE/skills/agentic-sf/scripts/uninstall.py" --yes
+          test ! -e asf && test ! -e justfile && test ! -e .env.sample
+          uv run "$GITHUB_WORKSPACE/skills/agentic-sf/scripts/uninstall.py" --yes | grep -q "no factory here"

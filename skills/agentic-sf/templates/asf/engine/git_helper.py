@@ -139,7 +139,7 @@ def merge_base(cwd: Pathish, ref: str, other: str = "HEAD") -> str:
     On the base branch itself this returns HEAD, which makes the diff exactly
     "what is not committed yet". Off it, the diff is the whole branch plus the
     working tree. One command covers both cases, so no ADW has to branch on it —
-    including a run on its own `sssf/<adw_id>` branch, where it returns the
+    including a run on its own `asf/<adw_id>` branch, where it returns the
     commit the worktree was cut from.
     """
     return _git(cwd, "merge-base", ref, other)

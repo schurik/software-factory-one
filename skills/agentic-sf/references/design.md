@@ -1,17 +1,18 @@
 # Design: workflows as directories over a closed vocabulary
 
-Why agentic-sf exists beside sssf, what it keeps, what it changes, and the
-rules that keep the change from decaying.
+What agentic-sf is, the rules that hold it together, and why each exists.
 
 ## The problem it answers
 
-sssf ships sixteen `adw_*.py` scripts and asks the engineer, on day one, which
-of sixteen. The README says "copy the closest and edit the phase list", but a
-107-line chain is not a list: its value is the fix loop, the retest-only-if-
-revised, the commit-after-green — the wiring *between* phases. And an agent's
-behaviour for a given task was spread over seven places (roster entry,
-system.md, user.md, the output type, the call site, prose constants in Python,
-gates in config), because `user.md` was per agent while the task is per stage.
+The obvious shape for an agent factory is one script per workflow, and it
+asks the engineer, on day one, which of a dozen. "Copy the closest and edit
+the phase list" does not work, because a hundred-line chain is not a list:
+its value is the fix loop, the retest-only-if-revised, the commit-after-green
+— the wiring *between* phases. And an agent's behaviour for a given task ends
+up spread over many places (a roster entry, a system prompt, a user prompt,
+the output type, the call site, prose constants in Python, gates in config),
+because a per-agent user prompt is the wrong owner when the task is per
+stage.
 
 ## What Warp got right, and what to take
 
@@ -87,6 +88,20 @@ stages:
   - commit: {of: implement}
 ```
 
+`input:` is where the request comes from, and it is the runner's business,
+not a stage's: `prompt` (the default) records the text; `issue` reads the
+work item before the first stage and comments the outcome after the last;
+`pr` reads the pull request BEFORE a session exists — its branch names the
+session to join — and answers the threads after the last stage. The
+stranger's text reaches the first stage as `ctx.previous`, an envelope whose
+artifact is the text with its framing, and the operator's instruction is
+`ctx.prompt`. So `issue` is `ship` with `input: issue`, and `pr-review` is
+implement → verify → commit with a task override and `allow_clean: true` on
+the commit — the option that gives a review run its third outcome
+(`declined`: an accepted run whose tree the builder did not touch, on
+purpose). Nothing in a workflow file can make an issue-triggered run merge;
+`integration` downgrades it to a pull request in code.
+
 Rules, enforced at load:
 
 1. **Vocabulary is closed.** A stage name must be a directory under
@@ -102,31 +117,34 @@ Rules, enforced at load:
 5. **Gates layer.** `--hitl` on the command line, then the stage's `hitl:`
    option, then factory.yaml's `hitl:` block.
 
-## The engine is sssf's engine
+## The engine
 
-`asf/engine/` is a copy of `adw_modules/`, renamed, with five additions:
+`asf/engine/` is the run machinery: session, worktree, permissions, gates,
+replay, hitl, limits, the tracer, the harnesses. The workflow layer sits on
+top of it through a small seam:
 
-- `PromptEngineering.user` optional, `system_append` added.
-- `AgentCall.task` and `AgentCall.variables`: the user prompt per call.
+- `PromptEngineering.user` is optional and `system_append` exists: an
+  identity is the roster's file plus what a workflow appends.
+- `AgentCall.task` and `AgentCall.variables`: the user prompt per call, which
+  is how a stage's task file reaches the agent.
 - `session.ensure(..., name=)`: the trace and `run.json` name the workflow.
 - `quality.run_blocks(run, names)`: a verify stage picks its blocks.
-- `agents.merge_defaults(raw)`: the merge, reusable by `engine.factory`.
+- `agents.merge_defaults(raw)`: one merge over defaults, used by `engine.factory`.
 
-Plus four new modules: `stage.py` (contract and registry), `tasks.py`
+And five modules of its own: `stage.py` (contract and registry), `tasks.py`
 (resolution and the report check), `factory.py` (roster from directories),
-`workflow.py` (load, validate, run). Everything downstream — worktree,
-permissions, replay, hitl, limits, the tracer — is untouched, which is why
-the visualizer needs no port: the db and schema are shared with sssf, and
-`observability.db` defaults to sssf's path so both factories show in one UI.
+`workflow.py` (load, validate, run), `inputs.py` (where a request comes from
+and where its outcome goes). The trace db is `asf/data/asf.db`; the
+visualizer under `apps/visualizer` reads it.
 
 ## What this costs
 
-- Readability moves. A 107-line script explained a run; now `workflow.yaml`
-  plus the stage modules do. The trace shows the sequence either way.
+- Readability moves. A script would explain a run top to bottom; now
+  `workflow.yaml` plus the stage modules do. The trace shows the sequence
+  either way.
 - The vocabulary will want to grow. A new *stage* is Python with a contract;
   a new *option* is policy on an existing stage; anything else is a
-  `workflow.py` escape hatch (planned, not stamped).
-- No migration. sssf stays as it is; this is a fresh install into `asf/`.
+  `workflow.py` escape hatch (not built — nothing has needed it).
 
 ## Slices
 
@@ -135,6 +153,9 @@ the visualizer needs no port: the db and schema are shared with sssf, and
 2. **Done:** review (with revise and retest), document, integrate stages;
    scout, ahead of the planner in `ship`; the gate CLI (`pending`, `show`, `approve`, `reject`, `abort`,
    `resume`) in `engine/operate.py`; `doctor`; the justfile.
-3. issue and pull-request inputs (`input: issue`, `input: pr`), the watchers,
-   `up`/`status`, kill, worktree pruning, uninstall; the `workflow.py` escape
-   hatch for pr-review.
+3. **Done:** `input: issue` and `input: pr` (`engine/inputs.py`), the `issue`
+   and `pr-review` workflows, both watchers (`engine/watch.py`), `up` and
+   `status` (`engine/supervise.py`), `kill` and the worktree verbs, the label a
+   re-entered issue run lands on resume, uninstall. The `workflow.py` escape
+   hatch was planned for pr-review and turned out unnecessary: one option on
+   `commit` covered it. It stays unbuilt until a shape actually needs it.

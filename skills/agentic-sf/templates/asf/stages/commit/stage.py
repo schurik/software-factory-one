@@ -28,6 +28,12 @@ class Options(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     of: str
+    # A clean tree is normally a failure: the stage before claimed to change
+    # files and did not. `allow_clean: true` is for the one chain where it is
+    # an answer — a builder handed REVIEW REQUESTS may read a thread, judge the
+    # ask wrong, and change nothing on purpose (`pr-review`); the run then
+    # reports "declined" instead of dying before it can say why.
+    allow_clean: bool = False
 
 
 def check(opts: Options, earlier: dict) -> list[str]:
@@ -48,7 +54,12 @@ def run(ctx, opts: Options):
                                description=f"Land the {opts.of} on the run's branch, in "
                                            f"the words of the agent that produced it")) as ph:
         message = envelope.commit_message or f"asf({run.adw_id}): {envelope.summary}"
-        sha = git_helper.commit_all(run.repo_root, message, allow_clean=run.resuming)
+        sha = git_helper.commit_all(run.repo_root, message,
+                                    allow_clean=run.resuming or opts.allow_clean)
+        if not sha and not run.resuming:
+            ph.log(committed="nothing — the tree is clean, on purpose (allow_clean)",
+                   reason=envelope.summary)
+            return None
         synced = integration.keep_published(run)
         ph.log(sha=sha or "unchanged — this session already committed it",
                message=message, pushed=synced.pushed, notes=" · ".join(synced.notes))

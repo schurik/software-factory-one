@@ -13,7 +13,7 @@ Two things every test here needs and nothing else provides:
     of one.
 
 Helpers live in `asf_helpers.py` and this directory is a package (see
-`__init__.py`): `skills/sssf/tests` is not one and imports its own
+`__init__.py`): another test directory in this repository is not one and imports its own
 `conftest` by that bare name, so this one must not be importable as it.
 """
 

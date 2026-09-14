@@ -10,6 +10,7 @@ Usage:
     uv run asf/asf.py doctor                     is this repo ready to run? checks + fixes
     uv run asf/asf.py run <workflow> "<prompt or path/to/prompt.md>"
                         [--adw-id a1b2c3d4] [--resume] [--hitl all|none|every|plan]
+    uv run asf/asf.py run <workflow> <number>    for a workflow with input: issue | pr
 
     uv run asf/asf.py pending                    runs stopped at a gate, waiting for you
     uv run asf/asf.py show <adw_id>              what a waiting run wants you to read
@@ -17,6 +18,13 @@ Usage:
     uv run asf/asf.py reject  <adw_id>  -m "what to change"
     uv run asf/asf.py abort   <adw_id> [-m "why"]
     uv run asf/asf.py resume  <adw_id> [--dry-run]   pick a failed run back up
+    uv run asf/asf.py kill    <adw_id> [--force]     stop a run: agents first, then the workflow
+
+    uv run asf/asf.py issues  once|loop|status [--interval 120]   a run per labelled issue
+    uv run asf/asf.py prs     once|loop|status [--interval 120] [--pr 17]   answer review threads
+    uv run asf/asf.py up      [--only issues,prs,obs] [--interval 120]   both watchers + trace UI
+    uv run asf/asf.py status                     what is watching, running, waiting, left behind
+    uv run asf/asf.py worktrees list|prune|remove <adw_id> [--force]
 
 `--config asf/factory.yaml` is accepted before or after the subcommand. Run
 from the repository root — every path in factory.yaml is relative to it.
@@ -32,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from engine import factory, operate, utils, workflow  # noqa: E402  (path set above)
+from engine import factory, operate, supervise, utils, watch, workflow  # noqa: E402
 
 DEFAULT_CONFIG = factory.DEFAULT_CONFIG
 
@@ -75,8 +83,9 @@ def cmd_doctor(args) -> int:
 
 def cmd_run(args) -> int:
     loaded = workflow.load(args.workflow, args.config)
-    return workflow.run(loaded, utils.resolve_prompt(args.prompt), args.adw_id,
-                        args.resume, args.hitl)
+    # A prompt may be a path to a file; an issue or pull request number is not.
+    request = args.prompt if loaded.input != "prompt" else utils.resolve_prompt(args.prompt)
+    return workflow.run(loaded, request, args.adw_id, args.resume, args.hitl)
 
 
 def cmd_pending(args) -> int:
@@ -94,6 +103,55 @@ def cmd_decide(args) -> int:
 
 def cmd_resume(args) -> int:
     return operate.relaunch(factory.load(args.config), args.config, args.adw_id, args.dry_run)
+
+
+def cmd_kill(args) -> int:
+    return operate.kill(factory.load(args.config), args.adw_id, args.force)
+
+
+def cmd_worktrees(args) -> int:
+    return operate.worktrees(factory.load(args.config), args.action, args.adw_id or "",
+                             args.force)
+
+
+def cmd_issues(args) -> int:
+    cfg = factory.load(args.config)
+    if args.action == "status":
+        return watch.issues_status(cfg)
+    _watched_workflows(args.config, cfg.issues.route.values(), "issue")
+    if args.action == "once":
+        return watch.issues_once(cfg, args.config)
+    return watch.issues_loop(cfg, args.config, args.interval)
+
+
+def cmd_prs(args) -> int:
+    cfg = factory.load(args.config)
+    if args.action == "status":
+        return watch.prs_status(cfg)
+    _watched_workflows(args.config, [cfg.pull_requests.workflow], "pr")
+    if args.action == "once":
+        code = watch.prs_once(cfg, args.config, args.pr)
+        return 0 if code == 3 else code
+    return watch.prs_loop(cfg, args.config, args.interval, args.pr)
+
+
+def _watched_workflows(config: str, names, kind: str) -> None:
+    """A watcher is refused before its first poll if a workflow it would launch
+    does not load, or takes the wrong input — a poller that launches a refused
+    run on every pass is the silent nothing `up` exists to remove."""
+    for name in names:
+        loaded = workflow.load(name, config)
+        if loaded.input != kind:
+            raise SystemExit(f"workflow {name!r} takes input: {loaded.input}, and the "
+                             f"{kind} watcher launches workflows with input: {kind}")
+
+
+def cmd_up(args) -> int:
+    return supervise.up(factory.load(args.config), args.config, args.interval, args.only)
+
+
+def cmd_status(args) -> int:
+    return supervise.status(factory.load(args.config))
 
 
 def _config_on(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -148,6 +206,33 @@ def build_parser() -> argparse.ArgumentParser:
     resume.add_argument("adw_id")
     resume.add_argument("--dry-run", action="store_true", help="print the command only")
     resume.set_defaults(func=cmd_resume)
+    kill = _config_on(sub.add_parser("kill", help="stop a run: agents first, then the workflow"))
+    kill.add_argument("adw_id")
+    kill.add_argument("--force", action="store_true",
+                      help="SIGKILL after the grace period; signal recycled pids too")
+    kill.set_defaults(func=cmd_kill)
+
+    for kind, help_text in (("issues", "a run per labelled issue"),
+                            ("prs", "answer review threads on this factory's pull requests")):
+        one = _config_on(sub.add_parser(kind, help=help_text))
+        one.add_argument("action", choices=["once", "loop", "status"])
+        one.add_argument("--interval", type=int, default=120, help="loop: seconds between polls")
+        if kind == "prs":
+            one.add_argument("--pr", type=int, default=0,
+                             help="watch one pull request; loop exits when it is merged or closed")
+        one.set_defaults(func=cmd_issues if kind == "issues" else cmd_prs)
+    up = _config_on(sub.add_parser("up", help="both watchers and the trace UI, in one process"))
+    up.add_argument("--interval", type=int, default=120, help="seconds between polls")
+    up.add_argument("--only", default="", help="comma-separated subset of obs,issues,prs")
+    up.set_defaults(func=cmd_up)
+    _config_on(sub.add_parser("status", help="what is watching, running, waiting, left behind")
+               ).set_defaults(func=cmd_status)
+    trees = _config_on(sub.add_parser("worktrees", help="list, prune or remove run worktrees"))
+    trees.add_argument("action", choices=["list", "prune", "remove"])
+    trees.add_argument("adw_id", nargs="?", help="remove: which run's worktree")
+    trees.add_argument("--force", action="store_true",
+                       help="also take worktrees holding uncommitted work")
+    trees.set_defaults(func=cmd_worktrees)
     return parser
 
 

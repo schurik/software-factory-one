@@ -8,7 +8,7 @@ says who the agent is. Its name is the directory's name, so it cannot be
 misspelt in two places, and its task is not here at all — that belongs to the
 stage that calls it (`engine.tasks`).
 
-What this module produces is the same `SSSFConfig` the rest of the engine has
+What this module produces is the same `FactoryConfig` the rest of the engine has
 always run on, so nothing downstream — session, worktree, permissions, the
 trace — knows the roster changed shape.
 """
@@ -20,7 +20,7 @@ from pathlib import Path
 import yaml
 
 from . import agents, frontmatter
-from .data_types import SSSFConfig
+from .data_types import FactoryConfig
 
 DEFAULT_CONFIG = "asf/factory.yaml"
 AGENT_FILE = "agent.md"
@@ -33,7 +33,7 @@ def root_of(config_path: str | Path) -> Path:
     return Path(config_path).parent
 
 
-def load(config_path: str | Path = DEFAULT_CONFIG) -> SSSFConfig:
+def load(config_path: str | Path = DEFAULT_CONFIG) -> FactoryConfig:
     """factory.yaml + every agents/<name>/agent.md, merged over defaults."""
     path = Path(config_path)
     if not path.is_file():

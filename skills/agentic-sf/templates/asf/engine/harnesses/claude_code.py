@@ -448,7 +448,7 @@ def _warn_once(key: str, message: str, on_event) -> None:
         return
     _WARNED.add(key)
     if on_event:
-        on_event({"type": "system", "subtype": "sssf_warning", "message": message})
+        on_event({"type": "system", "subtype": "asf_warning", "message": message})
 
 
 def _stream(cmd: list[str], request: AgentRequest, result: AgentResult,

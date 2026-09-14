@@ -50,6 +50,13 @@ def test_the_shipped_workflows_load_and_name_their_agents(factory_repo):
     scout = ship.steps[0].stage
     assert scout.needs == () and scout.output.__name__ == "ScoutOutput"
     assert ship.steps[1].stage.needs == ()                            # plan takes recon or nothing
+    issue = workflow.load("issue")
+    assert issue.input == "issue" and [s.stage.name for s in issue.steps][:2] == ["scout", "plan"]
+    review_flow = workflow.load("pr-review")
+    assert review_flow.input == "pr" and review_flow.required_agents == ["builder"]
+    assert review_flow.steps[0].tasks["implement"].endswith("workflows/pr-review/tasks/implement.md")
+    assert review_flow.steps[2].opts.allow_clean is True
+    assert sdlc.input == "prompt"
     review = ship.steps[5].stage
     assert review.tasks["review"][1].__name__ == "ReviewOutput"      # what it asks for
     assert review.tasks["revise"][1].__name__ == "BuildOutput"
@@ -112,6 +119,11 @@ def test_a_stage_outside_the_vocabulary_is_refused_with_the_vocabulary(factory_r
     message = refused("bad")
     assert "'deploy' is not a stage" in message
     assert "commit, document, implement, integrate, plan, review, scout, verify" in message
+
+
+def test_an_input_outside_the_three_is_refused(factory_repo):
+    write_workflow(factory_repo, "bad", {"description": "x", "input": "mail", "stages": QUICK})
+    assert "input" in refused("bad")
 
 
 def test_an_option_no_stage_takes_is_refused(factory_repo):

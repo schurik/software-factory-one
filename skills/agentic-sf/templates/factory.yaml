@@ -25,11 +25,10 @@ hitl:
   when_unattended: suspend         # suspend | auto
   notify_command: []               # run on suspend, subject on stdin
 
-# The trace. SHARED WITH SSSF ON PURPOSE: both factories write the same
-# schema, so one db and one visualizer show every run side by side. Point it
-# elsewhere if sssf is not installed and you would rather keep it under asf/.
+# The trace: every run streams into this SQLite db, and `just obs` shows it.
+# Under asf/data/ by default, so it is runtime the installer already ignores.
 observability:
-  db: adws/adw_data/sssf.db
+  db: asf/data/asf.db
   poll_ms: 500
 
 # Every run gets its own git worktree on its own branch, cut from a base ref
@@ -47,3 +46,76 @@ worktree:
     open_pr: false
     pr_command: ["gh", "pr", "create", "--fill"]
     pr_body_template: ""
+
+# ── where work comes from, and where it goes back to ────────────────────────
+#
+# Both OFF by default: the text driving the agents on these paths is written
+# by whoever can file an issue or review a pull request, not by the engineer
+# at the keyboard. A workflow says which it takes with `input: issue` or
+# `input: pr`; these blocks say how the tracker is read and written.
+
+# Work items. THE LABEL IS THE QUEUE and the routing label is the authorization:
+# a human applied it, and the watcher (`asf issues loop`, or `asf up`) never
+# looks at an issue that does not carry one.
+issues:
+  enabled: false
+  # WHICH REPO is watched. "" resolves once at startup from the origin remote of
+  # this checkout. Set it explicitly for cron — a watcher that silently polls
+  # the wrong project looks exactly like one with nothing to do.
+  project: ""                      # e.g. "acme/widgets"
+  # Commands, not API calls: the forge CLI is installed and authenticated in
+  # your shell already. glab, jira and linear fit the same four verbs.
+  fetch_command:   ["gh", "issue", "view"]
+  list_command:    ["gh", "issue", "list"]
+  comment_command: ["gh", "issue", "comment"]
+  state_command:   ["gh", "issue", "edit"]
+  # label -> WORKFLOW (one with `input: issue`). An empty map means nothing
+  # ever launches, which is the safe default.
+  route: {}
+  # route:
+  #   "asf:ship": issue
+  states:                          # the label state machine
+    queued:  "asf:queued"
+    running: "asf:running"
+    done:    "asf:done"
+    failed:  "asf:failed"
+  # [] accepts every issue author, because the person who applied the routing
+  # label is then the only authorization. Narrow it where anyone can label.
+  trusted_authors: []
+  max_concurrent: 2                # bounds runs in flight, not spend
+  # An issue-triggered run may not move the base branch, whatever
+  # worktree.integration.mode says. Enforced in engine/integration.py, not here.
+  force_pr: true
+
+# Review feedback on the factory's OWN pull requests, answered in the session
+# that opened them. THE UNRESOLVED THREAD IS THE QUEUE — there is no label to
+# claim: the forge already tracks which asks are outstanding and shows it to the
+# reviewer who wrote them. A run answers a thread and resolves it.
+pull_requests:
+  enabled: false
+  project: ""                      # "" = resolved once from origin, as in issues
+  workflow: pr-review              # which workflow answers a review; must say `input: pr`
+  # Review THREADS are the one thing `gh pr view --json` cannot return, so a
+  # pull request is read through graphql (state AND threads, one snapshot) and
+  # replies and resolves are written back the same way.
+  list_command:    ["gh", "pr", "list"]
+  comment_command: ["gh", "pr", "comment"]
+  state_command:   ["gh", "pr", "edit"]
+  graphql_command: ["gh", "api", "graphql"]
+  # [] accepts everyone: being able to review this repository's pull requests
+  # is itself the authorization. Narrow it where that is not true.
+  trusted_reviewers: []
+  ignore_authors: []               # bots whose comments are never work, e.g. ["codecov[bot]"]
+  reply_to_threads: true           # answer in the thread before resolving it
+  resolve_threads: true            # ...and only when the run addressed it
+  max_threads: 20                  # bounds the prompt; a bigger review is a conversation
+  max_concurrent: 2
+  # A merged or closed pull request ends its session: the watcher stops a review
+  # run still working that branch and releases its worktree. The BRANCH is
+  # never deleted — that belongs to whoever merged.
+  reap_merged: true
+  states:
+    # The only label this path uses: a run that ends red leaves its threads
+    # open, which is the condition that launched it. This mark stops the loop;
+    # a human removing it is the restart.
+    failed: "asf:pr-failed"

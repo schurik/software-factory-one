@@ -1,0 +1,23 @@
+# pr-review — answer the review feedback on one of this factory's own pull
+# requests. `asf run pr-review 17`, or the review watcher.
+#
+# THE STEP THAT CLOSES THE LOOP. Every other workflow ends when its branch is
+# proposed; this one starts there. `input: pr` reads the pull request BEFORE a
+# session exists and joins the session its branch names (`asf/<adw_id>`), so
+# the pull request is updated, never replaced. The open threads arrive at the
+# builder as an artifact framed as REQUESTS TO WEIGH; `tasks/implement.md`
+# beside this file is the task that says so, in place of the stage's default.
+#
+# `allow_clean` on the commit is what gives this chain its third outcome: a
+# builder that read a thread and changed nothing on purpose is `declined`, not
+# a dead run, and the reviewer gets its reason in the thread. There is no
+# integrate stage here at all — the branch is already under review, and the
+# commit stage pushes onto it.
+name: pr-review
+description: answer the open review threads on one of this factory's pull requests, in the session that opened it
+input: pr
+
+stages:
+  - implement: {agent: builder}
+  - verify:    {blocks: [test], max_fix_loops: 3, fix: {agent: builder}}
+  - commit:    {of: implement, allow_clean: true}

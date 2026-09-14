@@ -1,0 +1,25 @@
+# issue — a labelled work item, shipped. `asf run issue 42`, or the issue
+# watcher on `asf:queued` + a routing label (factory.yaml `issues.route`).
+#
+# `input: issue` is what makes this chain different, and it is the ONLY thing:
+# the tracker is read before the first stage and told the outcome after the
+# last, and the stages between are `ship`'s, unchanged. The reporter's text
+# reaches the scout and the planner as an artifact framed as a description of a
+# problem, never as instructions — and because the run is issue-triggered,
+# integration opens a pull request whatever `worktree.integration.mode` says
+# (`issues.force_pr`). A stranger's prompt does not move the base branch.
+name: issue
+description: a tracked work item, scouted, planned, built, verified, reviewed, documented and proposed as a pull request
+input: issue
+
+stages:
+  - scout:     {agent: scout}                      # the reporter guessed; the scout looked
+  - plan:      {agent: planner}                    # hitl: true is worth most here — a stranger's ask
+  - commit:    {of: plan}
+  - implement: {agent: builder}
+  - verify:    {blocks: [test], max_fix_loops: 3, fix: {agent: builder}}
+  - review:    {agent: reviewer, max_rounds: 2, revise: {agent: builder}, retest: [test]}
+  - commit:    {of: implement}
+  - document:  {agent: documenter}
+  - commit:    {of: document}
+  - integrate: {}                                  # a pull request, never a merge, on this input

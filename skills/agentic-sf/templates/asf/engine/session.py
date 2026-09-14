@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 from . import artifacts, git_helper, preflight, worktree
-from .data_types import RunSpec, RunState, SSSFConfig, WorktreeRequest
+from .data_types import RunSpec, RunState, FactoryConfig, WorktreeRequest
 from .hitl import HitlPolicy
 from .runner import Run
 from .tracer import Tracer
@@ -63,7 +63,7 @@ def _finalize_when_killed(run: Run) -> None:
         signal.signal(sig, handler)
 
 
-def ensure(cfg: SSSFConfig, adw_id: str | None = None, resume: bool = False,
+def ensure(cfg: FactoryConfig, adw_id: str | None = None, resume: bool = False,
            hitl: str = "", name: str | None = None) -> Run:
     """Pin or create the session and return the Run.
 

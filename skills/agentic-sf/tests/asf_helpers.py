@@ -18,7 +18,7 @@ from engine import frontmatter      # conftest puts templates/asf on the path fi
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 INSTALL = SKILL_ROOT / "scripts" / "install.py"
-DB = "adws/adw_data/sssf.db"
+DB = "asf/data/asf.db"
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -163,3 +163,99 @@ def run_state(repo: Path, adw_id: str) -> dict:
 def phase_names(repo: Path, adw_id: str) -> list[str]:
     return [row[0] for row in db_rows(
         repo, f"select name from phases where adw_id='{adw_id}' order by seq")]
+
+
+# ── a forge that records ─────────────────────────────────────────────────────
+#
+# The forge commands are config, so a python script standing in for `gh` is a
+# supported deployment, not a mock. It answers `view` from issue.json, `list`
+# from listing.json, `graphql` from pr.json, prints a url for `pr-create`, and
+# appends every other call to calls.json. `refuse.json` names verbs it refuses
+# with exit 1, the way a real one does when it cannot do an edit.
+
+FORGE = '''\
+import json, sys
+from pathlib import Path
+home = Path(sys.argv[1])
+verb, argv = sys.argv[2], sys.argv[3:]
+refuse = home / "refuse.json"
+if refuse.exists() and verb in json.loads(refuse.read_text()):
+    print(f"GraphQL: {verb} is not something this forge will do", file=sys.stderr)
+    sys.exit(1)
+log = home / "calls.json"
+entries = json.loads(log.read_text()) if log.exists() else []
+if verb == "view":
+    print((home / "issue.json").read_text())
+elif verb == "list":
+    print((home / "listing.json").read_text() if (home / "listing.json").exists() else "[]")
+elif verb == "graphql":
+    query = next((a for a in argv if a.startswith("query=")), "")
+    if "addPullRequestReviewThreadReply" in query or "resolveReviewThread" in query:
+        entries.append([verb, *argv])
+        print(json.dumps({"data": {}}))
+    else:
+        print((home / "pr.json").read_text())
+elif verb == "pr-create":
+    entries.append([verb, *argv])
+    print("https://forge/acme/widgets/pull/9")
+else:
+    entries.append([verb, *argv])
+log.write_text(json.dumps(entries))
+'''
+
+
+def forge(repo: Path) -> list[str]:
+    """Install the stand-in and return the argv prefix every forge command starts with."""
+    home = repo / ".forge"
+    home.mkdir(exist_ok=True)
+    (home / "forge.py").write_text(FORGE)
+    return [sys.executable, str(home / "forge.py"), str(home)]
+
+
+def forge_calls(repo: Path) -> list[list[str]]:
+    log = repo / ".forge" / "calls.json"
+    return json.loads(log.read_text()) if log.exists() else []
+
+
+def forge_data(repo: Path, name: str, payload) -> None:
+    (repo / ".forge" / name).write_text(json.dumps(payload))
+
+
+def set_config(repo: Path, **sections) -> None:
+    """Merge whole sections into the stamped factory.yaml."""
+    config = repo / "asf" / "factory.yaml"
+    raw = yaml.safe_load(config.read_text())
+    for key, value in sections.items():
+        raw[key] = {**(raw.get(key) or {}), **value} if isinstance(value, dict) else value
+    config.write_text(yaml.safe_dump(raw))
+
+
+def with_origin(repo: Path) -> Path:
+    """A bare remote beside the repo, with main pushed — what a pull request needs."""
+    origin = repo.parent / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    git(repo, "remote", "add", "origin", str(origin))
+    git(repo, "push", "-q", "-u", "origin", "main")
+    return origin
+
+
+def issue_json(number: int = 42, author: str = "someone", labels=("asf:queued", "asf:ship"),
+               body: str = "The /health endpoint returns 500.\n") -> dict:
+    return {"number": number, "title": f"health check broken (#{number})", "body": body,
+            "labels": [{"name": name} for name in labels], "author": {"login": author},
+            "state": "OPEN", "url": f"https://forge/acme/widgets/issues/{number}"}
+
+
+def pr_json(number: int, branch: str, threads: list[dict] | None = None,
+            state: str = "OPEN") -> dict:
+    nodes = [{"id": f"T{i}", "isResolved": False, "isOutdated": False,
+              "path": t.get("path", "app.py"), "line": t.get("line", 1),
+              "comments": {"nodes": [{"databaseId": i, "body": t["body"],
+                                      "createdAt": "2026-01-01T00:00:00Z",
+                                      "author": {"login": t.get("author", "reviewer")}}]}}
+             for i, t in enumerate(threads or [], start=1)]
+    return {"data": {"repository": {"pullRequest": {
+        "number": number, "title": "add app.py", "url": f"https://forge/acme/widgets/pull/{number}",
+        "state": state, "isDraft": False, "baseRefName": "main", "headRefName": branch,
+        "reviewDecision": "", "author": {"login": "someone"},
+        "reviewThreads": {"nodes": nodes}}}}}

@@ -1,10 +1,10 @@
 # agentic-sf recipes. Stamped by install.py, then yours to edit.
 #
 # Every recipe is one line over `asf/asf.py`; `just --list` is the menu. A
-# repository that also carries sssf's justfile got this file as
+# repository that already had a justfile of its own got this file as
 # `asf.justfile` instead — run it with `just -f asf.justfile <recipe>`, or
-# add `import 'asf.justfile'` to the other one (recipe names collide, so
-# rename on import if you do).
+# add `import 'asf.justfile'` to the other one (rename on import if recipe
+# names collide).
 
 # `.env` reaches every run through this, so keys work without exporting them.
 set dotenv-load
@@ -12,7 +12,7 @@ set positional-arguments
 
 # `ASF_CONFIG=other.yaml just do "..."` swaps the whole factory for one run.
 config := env_var_or_default("ASF_CONFIG", "asf/factory.yaml")
-db     := "adws/adw_data/sssf.db"
+db     := "asf/data/asf.db"
 asf    := "uv run asf/asf.py --config " + config
 
 # list every recipe
@@ -52,11 +52,23 @@ ship *ARGS:
 run WORKFLOW *ARGS:
     {{asf}} run {{WORKFLOW}} "${@:2}"
 
+# a tracked work item, end to end, proposed as a pull request: just issue 42
+issue NUMBER *ARGS:
+    {{asf}} run issue {{NUMBER}} "${@:2}"
+
+# answer the review threads on one of this factory's pull requests: just pr-review 17
+pr-review NUMBER *ARGS:
+    {{asf}} run pr-review {{NUMBER}} "${@:2}"
+
 # ── pick a run back up ──────────────────────────────────────────────────────
 
 # re-run a failed run from where it stopped: just resume <adw_id>
 resume ADW_ID *ARGS:
     {{asf}} resume {{ADW_ID}} "${@:2}"
+
+# stop a run — its agents first, then the workflow: just kill <adw_id> [--force]
+kill ADW_ID *ARGS:
+    {{asf}} kill {{ADW_ID}} "${@:2}"
 
 # ── answer a gate ───────────────────────────────────────────────────────────
 # A stage with `hitl: true` (or `--hitl` on the run) stops the run with exit
@@ -82,8 +94,61 @@ reject ADW_ID *ARGS:
 abort ADW_ID *ARGS:
     {{asf}} abort {{ADW_ID}} "${@:2}"
 
+# ── the long-running parts ──────────────────────────────────────────────────
+# The issue watcher, the review watcher and the trace UI. Forgetting one is
+# silent — a watcher that is not running looks exactly like one with nothing
+# to do — so `just up` starts all of them in one process and `just status`
+# says what is actually running.
+
+# start everything: both watchers + trace UI; ctrl-c stops it all
+up *ARGS:
+    {{asf}} up "$@"
+
+# is anything actually running? watchers, their last poll, runs in flight
+status:
+    @{{asf}} status
+
+# one poll of the tracker: launch a run per queued, routed issue
+issues:
+    {{asf}} issues once
+
+# what the issue watcher would do, and whether it can
+issues-status:
+    @{{asf}} issues status
+
+# keep polling — the cron form; `just up` is the one for a terminal
+issues-watch *ARGS:
+    {{asf}} issues loop "$@"
+
+# one poll of the open pull requests: answer what has review threads
+prs:
+    {{asf}} prs once
+
+# what the review watcher would do, and whether it can
+prs-status:
+    @{{asf}} prs status
+
+# keep polling; --pr <n> follows one pull request and exits when it lands
+prs-watch *ARGS:
+    {{asf}} prs loop "$@"
+
+# ── worktrees ───────────────────────────────────────────────────────────────
+# One per run, kept on failure. Branches are never deleted by any of these.
+
+# every run worktree, with the state of the run that owns it
+worktrees:
+    @{{asf}} worktrees list
+
+# remove the worktrees of ENDED runs with CLEAN trees; --force takes dirty ones too
+worktrees-prune *ARGS:
+    {{asf}} worktrees prune "$@"
+
+# remove one run's worktree: just worktrees-remove <adw_id> [--force]
+worktrees-remove ADW_ID *ARGS:
+    {{asf}} worktrees remove {{ADW_ID}} "${@:2}"
+
 # ── watch it ────────────────────────────────────────────────────────────────
-# The trace db is shared with sssf; reads never block a run.
+# Reads on the trace db never block a run.
 
 # the last 10 runs
 sessions:
@@ -97,6 +162,12 @@ phases ADW_ID:
 tail ADW_ID:
     @sqlite3 {{db}} "select rowid, type, name, started_at from events where adw_id='{{ADW_ID}}' order by rowid desc limit 25;"
 
-# the trace UI — sssf's visualizer over the shared db; needs SSSF_SKILL in .env
+# the trace UI only — the visualizer that ships with the skill, over the trace db
 obs:
-    uv run "${SSSF_SKILL:?set SSSF_SKILL in .env to the sssf skill directory — the visualizer ships there}/scripts/up.py" --only obs
+    {{asf}} up --only obs
+
+# ── leaving ─────────────────────────────────────────────────────────────────
+
+# delete the stamped factory out of this repo; the skill is untouched: just uninstall [--dry-run]
+uninstall *ARGS:
+    uv run "${ASF_SKILL:?not set - re-run install.py, which writes it into .env}/scripts/uninstall.py" --config {{config}} "$@"

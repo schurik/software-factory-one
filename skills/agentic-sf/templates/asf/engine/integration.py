@@ -1,6 +1,6 @@
 """Landing a run's branch — merge it, or push it and let a human decide.
 
-A run ends with its work on `sssf/<adw_id>` and nowhere else. Getting it from
+A run ends with its work on `asf/<adw_id>` and nowhere else. Getting it from
 there onto the base branch is a known command, not a judgement call, so it is a
 `kind="code"` phase over this module rather than an agent (SKILL.md rule 8).
 
@@ -45,7 +45,7 @@ from __future__ import annotations
 
 import subprocess
 
-from . import git_helper
+from . import artifacts, git_helper
 from .data_types import IntegrationRequest, IntegrationResult
 from .utils import operator_env
 
@@ -343,6 +343,11 @@ def _open_pr(run, result: IntegrationResult, params: IntegrationRequest) -> Inte
     # name the pull request without going back to the db.
     run.pr_url = result.pr_url or run.pr_url
     run.tracer.session_pr(run.adw_id, result.pr_url)
+    # And in the session's own file: the review watcher reads `pr_url` from
+    # run.json to know which sessions became pull requests, and a db is not
+    # something it may assume.
+    if run.pr_url:
+        artifacts.update_run(run.session_dir, pr_url=run.pr_url)
     return result
 
 
