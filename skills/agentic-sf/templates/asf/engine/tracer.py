@@ -1,6 +1,6 @@
 """Tracer: every event lands in JSONL and SQLite AS IT HAPPENS.
 
-Files are the raw record; sssf.db is the queryable mirror the UI polls.
+Files are the raw record; asf.db is the queryable mirror the UI polls.
 No push transport — the flow is always: agents -> sqlite -> web ui.
 WAL mode so the UI can read while ADW processes write.
 
@@ -32,7 +32,7 @@ from .utils import ensure_dir, new_id, now_iso
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
   adw_id        TEXT PRIMARY KEY,
-  adw_name      TEXT,                -- ADW script(s) run, e.g. "adw_plan + adw_build_test"
+  adw_name      TEXT,                -- workflow(s) run, e.g. "ship" or "issue + pr-review"
   request       TEXT,
   status        TEXT,
   engineer      TEXT,
@@ -231,7 +231,7 @@ class Tracer:
         self._migrate()
 
     def _migrate(self) -> None:
-        """Additive column migrations, so a db from an older SSSF still opens."""
+        """Additive column migrations, so a db from an older factory still opens."""
         for table, column, decl in MIGRATIONS:
             columns = {row[1] for row in self.conn.execute(f"PRAGMA table_info({table})")}
             if column not in columns:

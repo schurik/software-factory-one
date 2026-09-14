@@ -334,7 +334,7 @@ def pr_urls(sessions_dir: Path) -> dict[str, str]:
 
 
 def adw_names(sessions_dir: Path) -> dict[str, str]:
-    """{adw_id: "adw_plan + adw_build_test"} — which workflows a session ran.
+    """{adw_id: "issue + pr-review"} — which workflows a session ran.
 
     `pr_watch` reaps with this: stopping a review run whose branch has landed is
     cleanup, and stopping the SDLC run that opened that pull request and is

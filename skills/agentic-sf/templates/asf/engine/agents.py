@@ -20,7 +20,7 @@ from . import (artifacts, git_helper, harnesses, limits, permissions, preflight,
                prompts)
 from .data_types import (AgentCall, AgentConfig, AgentRequest, AgentResult,
                          AgentSession, EnvelopeBase, EventRecord, GateCheck,
-                         GateReport, Phase, RecordedPhase, SSSFConfig,
+                         GateReport, Phase, RecordedPhase, FactoryConfig,
                          UsageBreakdown)
 from .utils import anchor
 
@@ -44,7 +44,7 @@ def harness_for(agent: AgentConfig):
 
 # ── config ───────────────────────────────────────────────────────────────────
 
-def load_config(path: str = "asf/factory.yaml") -> SSSFConfig:
+def load_config(path: str = "asf/factory.yaml") -> FactoryConfig:
     """Read a single-file config (defaults + agents list), merging defaults in.
 
     The stamped layout keeps agents in `asf/agents/<name>/` instead, and
@@ -55,7 +55,7 @@ def load_config(path: str = "asf/factory.yaml") -> SSSFConfig:
     return merge_defaults(raw)
 
 
-def merge_defaults(raw: dict) -> SSSFConfig:
+def merge_defaults(raw: dict) -> FactoryConfig:
     """Merge each agent over `defaults` key by key and build the config."""
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
@@ -71,10 +71,10 @@ def merge_defaults(raw: dict) -> SSSFConfig:
         inherited = (defaults.get("harness_options") or {}).get(agent.get("harness"), {})
         agent["harness_options"] = {**(inherited or {}),
                                     **(agent.get("harness_options") or {})}
-    return SSSFConfig(**raw)
+    return FactoryConfig(**raw)
 
 
-def resolve(cfg: SSSFConfig, name: str) -> AgentConfig:
+def resolve(cfg: FactoryConfig, name: str) -> AgentConfig:
     for agent in cfg.agents:
         if agent.name == name:
             return agent
@@ -82,7 +82,7 @@ def resolve(cfg: SSSFConfig, name: str) -> AgentConfig:
                      f"available: {[a.name for a in cfg.agents]}")
 
 
-def validate(cfg: SSSFConfig, required: list[str]) -> None:
+def validate(cfg: FactoryConfig, required: list[str]) -> None:
     """Fail fast: every required name must resolve to a usable agent.
 
     Prompt files are looked for in the MAIN checkout, which is where the roster

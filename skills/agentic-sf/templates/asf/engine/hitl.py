@@ -2,7 +2,7 @@
 
 A gate is its own `kind="engineer"` phase — the lane that until now only ever
 logged the request — plus a revise loop that is the reviewer loop in
-`adw_build_review.py` with a person where the reviewer is. `gated()` owns both.
+the review stage with a person where the reviewer is. `gated()` owns both.
 An ADW spends one call per gate and never sees the loop, the wait, or the file.
 
 THE WAIT IS A SUSPEND. `decide()` looks for a decision this session already
@@ -114,7 +114,7 @@ def attended() -> bool:
 
     Only the LAUNCHER knows which it is, so the launcher says so: the watchers
     set `ASF_UNATTENDED` on the runs they start. `run.trigger` cannot answer
-    this — an engineer who types `uv run adws/adw_issue_sdlc.py 42` at their own
+    this — an engineer who types `uv run asf/asf.py run issue 42` at their own
     keyboard is on the `issue` trigger too, and should still be asked in place.
     """
     if os.environ.get(UNATTENDED_ENV, "").strip():

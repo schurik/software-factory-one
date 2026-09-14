@@ -24,7 +24,7 @@ A breach is NOT a gate violation. Gates are for work an agent can be asked to
 redo; a breach cannot be corrected by re-prompting, because the write already
 happened. It aborts the phase and names every offending path.
 
-Two keys drive it, both in sssf.config.yaml:
+Two keys drive it, both in factory.yaml:
     defaults.protected_files   paths no agent may touch unless it names them itself
     agents[].writes      None = unrestricted · [] = read-only · [...] = only these
 """
@@ -35,7 +35,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from .data_types import AgentConfig, SSSFConfig
+from .data_types import AgentConfig, FactoryConfig
 
 
 class PermissionBreach(RuntimeError):
@@ -107,7 +107,7 @@ def _matches(path: str, pattern: str) -> bool:
     return path == pattern
 
 
-def always_writable(cfg: SSSFConfig) -> list[str]:
+def always_writable(cfg: FactoryConfig) -> list[str]:
     """The session runtime, which EVERY agent must be able to write.
 
     `context_handoff/` is the one place agents hand work to each other, and an
@@ -133,7 +133,7 @@ def always_writable(cfg: SSSFConfig) -> list[str]:
     return [cfg.defaults.data_dir.rstrip("/") + "/"]
 
 
-def permitted(path: str, agent: AgentConfig, cfg: SSSFConfig) -> bool:
+def permitted(path: str, agent: AgentConfig, cfg: FactoryConfig) -> bool:
     """Session runtime first, then the agent's own list, then what is protected."""
     if any(_matches(path, p) for p in always_writable(cfg)):
         return True

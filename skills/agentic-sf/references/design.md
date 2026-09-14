@@ -1,17 +1,18 @@
 # Design: workflows as directories over a closed vocabulary
 
-Why agentic-sf exists beside sssf, what it keeps, what it changes, and the
-rules that keep the change from decaying.
+What agentic-sf is, the rules that hold it together, and why each exists.
 
 ## The problem it answers
 
-sssf ships sixteen `adw_*.py` scripts and asks the engineer, on day one, which
-of sixteen. The README says "copy the closest and edit the phase list", but a
-107-line chain is not a list: its value is the fix loop, the retest-only-if-
-revised, the commit-after-green — the wiring *between* phases. And an agent's
-behaviour for a given task was spread over seven places (roster entry,
-system.md, user.md, the output type, the call site, prose constants in Python,
-gates in config), because `user.md` was per agent while the task is per stage.
+The obvious shape for an agent factory is one script per workflow, and it
+asks the engineer, on day one, which of a dozen. "Copy the closest and edit
+the phase list" does not work, because a hundred-line chain is not a list:
+its value is the fix loop, the retest-only-if-revised, the commit-after-green
+— the wiring *between* phases. And an agent's behaviour for a given task ends
+up spread over many places (a roster entry, a system prompt, a user prompt,
+the output type, the call site, prose constants in Python, gates in config),
+because a per-agent user prompt is the wrong owner when the task is per
+stage.
 
 ## What Warp got right, and what to take
 
@@ -116,31 +117,34 @@ Rules, enforced at load:
 5. **Gates layer.** `--hitl` on the command line, then the stage's `hitl:`
    option, then factory.yaml's `hitl:` block.
 
-## The engine is sssf's engine
+## The engine
 
-`asf/engine/` is a copy of `adw_modules/`, renamed, with five additions:
+`asf/engine/` is the run machinery: session, worktree, permissions, gates,
+replay, hitl, limits, the tracer, the harnesses. The workflow layer sits on
+top of it through a small seam:
 
-- `PromptEngineering.user` optional, `system_append` added.
-- `AgentCall.task` and `AgentCall.variables`: the user prompt per call.
+- `PromptEngineering.user` is optional and `system_append` exists: an
+  identity is the roster's file plus what a workflow appends.
+- `AgentCall.task` and `AgentCall.variables`: the user prompt per call, which
+  is how a stage's task file reaches the agent.
 - `session.ensure(..., name=)`: the trace and `run.json` name the workflow.
 - `quality.run_blocks(run, names)`: a verify stage picks its blocks.
-- `agents.merge_defaults(raw)`: the merge, reusable by `engine.factory`.
+- `agents.merge_defaults(raw)`: one merge over defaults, used by `engine.factory`.
 
-Plus four new modules: `stage.py` (contract and registry), `tasks.py`
+And five modules of its own: `stage.py` (contract and registry), `tasks.py`
 (resolution and the report check), `factory.py` (roster from directories),
-`workflow.py` (load, validate, run). Everything downstream — worktree,
-permissions, replay, hitl, limits, the tracer — is untouched, which is why
-the visualizer needs no port: the db and schema are shared with sssf, and
-`observability.db` defaults to sssf's path so both factories show in one UI.
+`workflow.py` (load, validate, run), `inputs.py` (where a request comes from
+and where its outcome goes). The trace db is `asf/data/asf.db`; the
+visualizer under `apps/visualizer` reads it.
 
 ## What this costs
 
-- Readability moves. A 107-line script explained a run; now `workflow.yaml`
-  plus the stage modules do. The trace shows the sequence either way.
+- Readability moves. A script would explain a run top to bottom; now
+  `workflow.yaml` plus the stage modules do. The trace shows the sequence
+  either way.
 - The vocabulary will want to grow. A new *stage* is Python with a contract;
   a new *option* is policy on an existing stage; anything else is a
   `workflow.py` escape hatch (not built — nothing has needed it).
-- No migration. sssf stays as it is; this is a fresh install into `asf/`.
 
 ## Slices
 

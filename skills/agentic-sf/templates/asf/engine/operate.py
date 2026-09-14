@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 from . import artifacts, git_helper, hitl, inputs, preflight, worktree
-from .data_types import SSSFConfig
+from .data_types import FactoryConfig
 from .utils import engineer_name
 
 GRACE_SECONDS = 5.0
@@ -34,7 +34,7 @@ GREEN, YELLOW, RED, DIM, RESET = "\033[32m", "\033[33m", "\033[31m", "\033[2m", 
 MARKS = {"ok": (GREEN, "✓"), "warn": (YELLOW, "~"), "fatal": (RED, "✗")}
 
 
-def sessions_dir(cfg: SSSFConfig) -> Path:
+def sessions_dir(cfg: FactoryConfig) -> Path:
     return artifacts.sessions_root(git_helper.main_root(), cfg.defaults.data_dir)
 
 
@@ -45,7 +45,7 @@ def _answer_hint(adw_id: str) -> str:
 
 # ── gates ────────────────────────────────────────────────────────────────────
 
-def pending(cfg: SSSFConfig) -> int:
+def pending(cfg: FactoryConfig) -> int:
     waiting = artifacts.waiting_sessions(sessions_dir(cfg))
     if not waiting:
         print("no run is waiting at a gate")
@@ -59,7 +59,7 @@ def pending(cfg: SSSFConfig) -> int:
     return 0
 
 
-def show(cfg: SSSFConfig, adw_id: str) -> int:
+def show(cfg: FactoryConfig, adw_id: str) -> int:
     state = artifacts.read_run(sessions_dir(cfg) / adw_id)
     if state is None:
         print(f"{adw_id}: no such session — `asf sessions`")
@@ -87,7 +87,7 @@ def show(cfg: SSSFConfig, adw_id: str) -> int:
     return 0
 
 
-def decide(cfg: SSSFConfig, config_path: str, verdict: str, adw_id: str, notes: str,
+def decide(cfg: FactoryConfig, config_path: str, verdict: str, adw_id: str, notes: str,
            no_resume: bool = False) -> int:
     """Record one verdict, then bring the run back unless told not to.
 
@@ -160,7 +160,7 @@ def rebuild(command: list[str], adw_id: str, config_path: str) -> list[str]:
     return [sys.executable, RUNNER, "--config", config_path, *rest, "--adw-id", adw_id, "--resume"]
 
 
-def relaunch(cfg: SSSFConfig, config_path: str, adw_id: str, dry_run: bool = False,
+def relaunch(cfg: FactoryConfig, config_path: str, adw_id: str, dry_run: bool = False,
              passthrough: tuple[str, ...] = ()) -> int:
     """Re-launch the workflow that recorded `adw_id`, with `--resume`."""
     session_dir = sessions_dir(cfg) / adw_id
@@ -220,7 +220,7 @@ def _matches(pid: int, recorded: str) -> bool:
     return bool(actual) and head in actual
 
 
-def kill(cfg: SSSFConfig, adw_id: str, force: bool = False) -> int:
+def kill(cfg: FactoryConfig, adw_id: str, force: bool = False) -> int:
     """Stop a run: its agent children first, then the workflow itself.
 
     A hung agent emits nothing, which is exactly when you need its pid;
@@ -285,7 +285,7 @@ def kill(cfg: SSSFConfig, adw_id: str, force: bool = False) -> int:
 
 # ── worktrees ────────────────────────────────────────────────────────────────
 
-def worktrees(cfg: SSSFConfig, action: str, adw_id: str = "", force: bool = False) -> int:
+def worktrees(cfg: FactoryConfig, action: str, adw_id: str = "", force: bool = False) -> int:
     """list, prune, remove. `prune` takes a worktree only when the run that
     owns it has ENDED and the tree is CLEAN; `--force` widens it to every
     ended run's tree, uncommitted work included. Branches are always kept:
@@ -342,7 +342,7 @@ def _paint(color: str, text: str) -> str:
     return f"{color}{text}{RESET}" if sys.stdout.isatty() else text
 
 
-def doctor(cfg: SSSFConfig) -> int:
+def doctor(cfg: FactoryConfig) -> int:
     """Everything that would fail later, in one screen. 0 unless something is
     fatal, so it works as a first CI step too. The checks live in
     `engine.preflight`, stamped and yours to edit; this is the screen."""

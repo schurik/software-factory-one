@@ -1,6 +1,6 @@
 """Landing a run's branch — merge it, or push it and let a human decide.
 
-A run ends with its work on `sssf/<adw_id>` and nowhere else. Getting it from
+A run ends with its work on `asf/<adw_id>` and nowhere else. Getting it from
 there onto the base branch is a known command, not a judgement call, so it is a
 `kind="code"` phase over this module rather than an agent (SKILL.md rule 8).
 

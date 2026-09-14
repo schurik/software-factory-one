@@ -4,7 +4,7 @@ Upstream runs in the engineer's working tree, on whatever branch happens to be
 checked out. That makes two runs unable to be concurrent, makes a failed run
 destructive, and makes `commit_all()` pick up whatever else was lying around.
 
-So every run gets `<worktrees_dir>/<adw_id>` on branch `sssf/<adw_id>`, cut from
+So every run gets `<worktrees_dir>/<adw_id>` on branch `asf/<adw_id>`, cut from
 a base ref pinned once at run start. `Run.repo_root` becomes that directory, and
 because agents, gates, quality blocks and the permission snapshot all derive
 from `repo_root`, the isolation follows from one assignment rather than from

@@ -34,7 +34,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from . import agents, factory, git_helper, inputs, session, tasks
-from .data_types import AgentConfig, BuildOutput, EnvelopeBase, PhaseParams, SSSFConfig
+from .data_types import AgentConfig, BuildOutput, EnvelopeBase, PhaseParams, FactoryConfig
 from .stage import StageContext, StageModule, StageStop, Step, load_registry
 
 
@@ -69,7 +69,7 @@ class Workflow:
     name: str
     description: str
     directory: Path
-    cfg: SSSFConfig
+    cfg: FactoryConfig
     steps: list[Step]
     required_agents: list[str] = field(default_factory=list)
     input: str = "prompt"                  # prompt | issue | pr — see engine.inputs
@@ -125,8 +125,8 @@ def load(name: str, config_path: str | Path = factory.DEFAULT_CONFIG) -> Workflo
 
 # ── agents ───────────────────────────────────────────────────────────────────
 
-def _bind_agents(cfg: SSSFConfig, spec: Spec, directory: Path,
-                 problems: list[str]) -> SSSFConfig:
+def _bind_agents(cfg: FactoryConfig, spec: Spec, directory: Path,
+                 problems: list[str]) -> FactoryConfig:
     by_name = {agent.name: agent for agent in cfg.agents}
     bound: dict[str, AgentConfig] = dict(by_name)
     for alias, binding in spec.agents.items():
@@ -179,7 +179,7 @@ def _widens(requested: list[str], allowed: Optional[list[str]], exact: bool) -> 
 
 # ── stages ───────────────────────────────────────────────────────────────────
 
-def _steps(spec: Spec, registry: dict[str, StageModule], cfg: SSSFConfig,
+def _steps(spec: Spec, registry: dict[str, StageModule], cfg: FactoryConfig,
            directory: Path, problems: list[str]) -> list[Step]:
     steps: list[Step] = []
     known_agents = {agent.name for agent in cfg.agents}
@@ -239,7 +239,7 @@ def _agent_fields(opts: BaseModel) -> list[str]:
     return found
 
 
-def _merge_hitl(cfg: SSSFConfig, stage: StageModule, opts: BaseModel) -> None:
+def _merge_hitl(cfg: FactoryConfig, stage: StageModule, opts: BaseModel) -> None:
     """A stage's `hitl:` option decides its gate for this workflow. Three
     layers, each overriding the one below: `--hitl` on the command line, this,
     then factory.yaml's `hitl:` block. `None` here means the workflow has no

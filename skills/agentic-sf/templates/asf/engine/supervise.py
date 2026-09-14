@@ -7,9 +7,9 @@ watcher with nothing to do. So this is a supervisor: one process that owns
 every child, prefixes their output, restarts what dies, and takes the whole
 tree down with it. NOT A DAEMON — the terminal it runs in is the handle.
 
-The trace UI is sssf's visualizer over the shared db, read from the sssf
-skill `SSSF_SKILL` in `.env` points at. Absent, `up` runs without it and says
-so; the watchers are the part that must not be forgotten.
+The trace UI ships with the skill (`apps/visualizer`), reached through the
+`ASF_SKILL` the installer wrote into `.env`. Absent, `up` runs without it and
+says so; the watchers are the part that must not be forgotten.
 
 `status` answers the other half: is anything running right now, and did it
 poll recently — from the watcher heartbeat FILES and a probe of each pid, so a
@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import artifacts, git_helper, preflight, worktree
-from .data_types import SSSFConfig
+from .data_types import FactoryConfig
 from .utils import anchor
 
 RUNNER = "asf/asf.py"
@@ -94,14 +94,14 @@ def _stop(service: Service, grace: float = 8.0) -> None:
 
 
 def visualizer_dir() -> Path | None:
-    skill = os.environ.get("SSSF_SKILL", "").strip()
+    skill = os.environ.get("ASF_SKILL", "").strip()
     if not skill:
         return None
     home = Path(skill) / "apps" / "visualizer"
     return home if (home / "server" / "index.ts").is_file() else None
 
 
-def wanted(cfg: SSSFConfig, only: str) -> set[str]:
+def wanted(cfg: FactoryConfig, only: str) -> set[str]:
     if only:
         chosen = {part.strip() for part in only.split(",") if part.strip()}
         unknown = chosen - {"obs", "issues", "prs"}
@@ -119,13 +119,13 @@ def wanted(cfg: SSSFConfig, only: str) -> set[str]:
     return want
 
 
-def check(cfg: SSSFConfig, want: set[str]) -> list[str]:
+def check(cfg: FactoryConfig, want: set[str]) -> list[str]:
     """What would stop THESE services. Non-fatal findings drop the service."""
     if "obs" in want:
         home = visualizer_dir()
         if home is None:
-            print(paint(DIM, "  ~ no trace UI: set SSSF_SKILL in .env to the sssf skill "
-                             "directory (the visualizer ships there)"))
+            print(paint(DIM, "  ~ no trace UI: ASF_SKILL in .env must point at the skill "
+                             "directory (the visualizer ships there) — install.py writes it"))
             want.discard("obs")
         elif not shutil.which("bun"):
             print(paint(DIM, "  ~ bun is not on PATH — starting without the trace UI"))
@@ -147,7 +147,7 @@ def services(want: set[str], config_path: str, interval: int, main_root: Path,
     if "obs" in want:
         home = visualizer_dir()
         found.append(Service("obs", ["bun", "run", "server/index.ts"], home,
-                             {"SSSF_DB": str(db), "PORT": str(API_PORT)}))
+                             {"ASF_DB": str(db), "PORT": str(API_PORT)}))
         found.append(Service("ui", ["bunx", "vite"], home, {"PORT": str(API_PORT)}))
     for name in ("issues", "prs"):
         if name in want:
@@ -157,7 +157,7 @@ def services(want: set[str], config_path: str, interval: int, main_root: Path,
     return found
 
 
-def up(cfg: SSSFConfig, config_path: str, interval: int, only: str) -> int:
+def up(cfg: FactoryConfig, config_path: str, interval: int, only: str) -> int:
     main_root = git_helper.main_root()
     db = anchor(main_root, cfg.observability.db)
     print(f"asf up — {main_root}")
@@ -276,7 +276,7 @@ def _pid_alive(pid: int) -> bool:
         return True
 
 
-def status(cfg: SSSFConfig) -> int:
+def status(cfg: FactoryConfig) -> int:
     """One screen: what is watching, what is running, what is left behind —
     all from files, so it answers on a machine with no trace db."""
     main_root = git_helper.main_root()

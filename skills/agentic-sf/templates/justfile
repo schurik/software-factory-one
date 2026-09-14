@@ -1,10 +1,10 @@
 # agentic-sf recipes. Stamped by install.py, then yours to edit.
 #
 # Every recipe is one line over `asf/asf.py`; `just --list` is the menu. A
-# repository that also carries sssf's justfile got this file as
+# repository that already had a justfile of its own got this file as
 # `asf.justfile` instead — run it with `just -f asf.justfile <recipe>`, or
-# add `import 'asf.justfile'` to the other one (recipe names collide, so
-# rename on import if you do).
+# add `import 'asf.justfile'` to the other one (rename on import if recipe
+# names collide).
 
 # `.env` reaches every run through this, so keys work without exporting them.
 set dotenv-load
@@ -12,7 +12,7 @@ set positional-arguments
 
 # `ASF_CONFIG=other.yaml just do "..."` swaps the whole factory for one run.
 config := env_var_or_default("ASF_CONFIG", "asf/factory.yaml")
-db     := "adws/adw_data/sssf.db"
+db     := "asf/data/asf.db"
 asf    := "uv run asf/asf.py --config " + config
 
 # list every recipe
@@ -148,7 +148,7 @@ worktrees-remove ADW_ID *ARGS:
     {{asf}} worktrees remove {{ADW_ID}} "${@:2}"
 
 # ── watch it ────────────────────────────────────────────────────────────────
-# The trace db is shared with sssf; reads never block a run.
+# Reads on the trace db never block a run.
 
 # the last 10 runs
 sessions:
@@ -162,7 +162,7 @@ phases ADW_ID:
 tail ADW_ID:
     @sqlite3 {{db}} "select rowid, type, name, started_at from events where adw_id='{{ADW_ID}}' order by rowid desc limit 25;"
 
-# the trace UI only — sssf's visualizer over the shared db; needs SSSF_SKILL in .env
+# the trace UI only — the visualizer that ships with the skill, over the trace db
 obs:
     {{asf}} up --only obs
 

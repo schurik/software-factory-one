@@ -22,9 +22,9 @@ Three files live in a namespace the repository had before the factory arrived �
 and **kept the moment it differs**. A `.env` holding your API keys and a
 justfile holding your own recipes are not the factory's to delete.
 
-THE TRACE DB IS SHARED WITH sssf. It is deleted only when sssf is not stamped
-here too (no `adws/adw_modules/`); otherwise it is sssf's and stays, with a
-line saying so.
+The trace db goes with the run record. It lives under `asf/data/` unless
+`observability.db` was pointed elsewhere, in which case that file (and its
+`-wal`/`-shm` siblings) is deleted by name.
 
 Refuses while anything is still running: a half-deleted factory under a live
 run is the one state worse than either end of this. `asf kill <adw_id>` and
@@ -52,7 +52,7 @@ SKILL_ROOT = install.SKILL_ROOT
 TEMPLATES = install.TEMPLATES
 
 CONFIG = "asf/factory.yaml"
-DEFAULT_DB = "adws/adw_data/sssf.db"
+DEFAULT_DB = "asf/data/asf.db"
 DEFAULT_DATA_DIR = "asf/data"
 DEFAULT_WORKTREE_DIR = ".asf-worktrees"
 DEFAULT_BRANCH_PREFIX = "asf/"
@@ -195,10 +195,6 @@ def env_is_only_stamped(env: Path) -> bool:
     return any(strip(env.read_text()) == strip(sample) for sample in shipped_env_samples())
 
 
-def sssf_is_here(root: Path) -> bool:
-    return (root / "adws" / "adw_modules").is_dir()
-
-
 # ── the plan ─────────────────────────────────────────────────────────────────
 
 def build_plan(root: Path, db: Path, wt_dir: str, prefix: str) -> dict:
@@ -234,12 +230,10 @@ def build_plan(root: Path, db: Path, wt_dir: str, prefix: str) -> dict:
             keep.append(".env — it holds values the sample does not; only the ASF_SKILL "
                         "line is removed")
 
-    db_files = [p for p in (db, db.with_name(db.name + "-wal"), db.with_name(db.name + "-shm"))
-                if p.is_file()]
-    if db_files and sssf_is_here(root):
-        keep.append(f"{db.relative_to(root)} — the trace db is shared with sssf, which is "
-                    f"still stamped here; its runs are in it too")
-        db_files = []
+    # Under asf/ the db goes with the directory; elsewhere it is named and deleted.
+    db_files = [] if (root / "asf") in db.parents else [
+        p for p in (db, db.with_name(db.name + "-wal"), db.with_name(db.name + "-shm"))
+        if p.is_file()]
 
     _, dropped, precise = gitignore_without_block(root / ".gitignore")
     return {

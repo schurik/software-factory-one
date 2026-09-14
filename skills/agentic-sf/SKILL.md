@@ -1,14 +1,14 @@
 ---
 name: agentic-sf
-description: Agentic Software Factory — workflows as directories (workflow.yaml + tasks + agent bindings) over a closed stage vocabulary, with one entry point. The successor design to sssf, built beside it on the same engine and the same trace db. Use when the user asks to install agentic-sf (/sssf:agentic-sf install, or plain words), run a workflow with asf, list or check workflows, create or edit a workflow directory, tune an agent's identity or a stage's task, or compare a run with sssf. Keywords - agentic-sf, asf, software factory, workflow.yaml, stage, task file, agent directory, factory.yaml.
+description: Agentic Software Factory — workflows as directories (workflow.yaml + tasks + agent bindings) over a closed stage vocabulary, with one entry point. Use when the user asks to install agentic-sf (`/agentic-sf install`, or plain words), run a workflow with asf, list or check workflows, create or edit a workflow directory, tune an agent's identity or a stage's task, or inspect a run's trace. Keywords - agentic-sf, asf, software factory, workflow.yaml, stage, task file, agent directory, factory.yaml.
 argument-hint: "[install | run <workflow> \"<prompt>\" | list | check | create workflow | edit agent | ...]"
 ---
 
 # Agentic Software Factory (asf)
 
-The same idea as sssf — deterministic code owns sequencing, retries and
-acceptance; coding agents work inside bounded phases; typed envelopes cross
-the seams; everything streams into SQLite — with a different surface:
+Deterministic code owns sequencing, retries and acceptance; coding agents
+work inside bounded phases; typed envelopes cross the seams; everything
+streams into SQLite. The surface:
 
 - **One entry point.** `just do "<prompt>"`, or `uv run asf/asf.py run <workflow>
   "<prompt>"`. `list`, `check`, `doctor`, the gate verbs, the watchers, `up`,
@@ -47,8 +47,8 @@ the waiting and route it.
 You run the system and help the engineer interact with it. **You do no
 workflow work yourself**: never plan, implement or test in an agent's place —
 launch the workflow and watch it. Never edit files under `asf/data/`; that is
-the run record. The trace db (`adws/adw_data/sssf.db`, shared with sssf) is
-yours to query when observing is the task, never to volunteer a status board.
+the run record. The trace db (`asf/data/asf.db`) is yours to query when
+observing is the task, never to volunteer a status board.
 
 ## Where things live in a stamped repo
 
@@ -80,7 +80,7 @@ downgrades a configured merge to a pull request on those inputs, in code.
 | start the watchers / "is anything polling?" | `just up` (both watchers + trace UI, ctrl-c stops all), `just status`; one poll: `just issues`, `just prs`; cron form: `just issues-watch`, `just prs-watch`. Turn them on in `factory.yaml` (`issues.enabled`, `issues.route`, `pull_requests.enabled`) |
 | stop a run | `just kill <id>` — agents first, then the workflow; `--force` SIGKILLs |
 | tidy up | `just worktrees`, `just worktrees-prune [--force]`, `just worktrees-remove <id>`; branches are never deleted |
-| remove the factory from this repo | `just uninstall [--dry-run]` — the skill is untouched; the shared trace db stays if sssf is stamped too |
+| remove the factory from this repo | `just uninstall [--dry-run]` — the skill is untouched; the run record goes with `asf/` |
 | which workflows exist / what does X do | `uv run asf/asf.py list`; read `asf/workflows/<name>/workflow.yaml` |
 | is this workflow runnable | `uv run asf/asf.py check <name>` — spawns nothing, names every problem |
 | create a workflow | copy the closest directory under `asf/workflows/`, edit `workflow.yaml`, run `check`. Read [references/design.md](references/design.md#workflows) first |
@@ -90,7 +90,7 @@ downgrades a configured merge to a pull request on those inputs, in code.
 | add a stage to the vocabulary | a directory under `asf/stages/` meeting the contract in `asf/engine/stage.py`; [references/design.md](references/design.md#stages) |
 | pick a failed run back up | `just resume <id>` — replays recorded agent phases, re-runs what code owns |
 | a run is waiting at a gate / "why is this run waiting?" | `just pending`, `just show <id>`, then `just approve <id> [-m]`, `just reject <id> -m "..."` or `just abort <id>`. Never approve on the engineer's behalf |
-| watch a run | `just sessions`, `just phases <id>`, `just tail <id>`; `just obs` boots sssf's visualizer over the shared db |
+| watch a run | `just sessions`, `just phases <id>`, `just tail <id>`; `just obs` boots the trace UI (`apps/visualizer` in the skill, needs bun) |
 
 ## Hard rules
 
@@ -107,9 +107,11 @@ downgrades a configured merge to a pull request on those inputs, in code.
    five builders.
 5. **Tasks carry the words, stages carry the facts.** A stage passes
    `{{variables}}`; no prose lives in Python.
-6. Everything sssf's hard rules say about envelopes, gates, `writes:`,
-   `protected_files`, phase descriptions and `run.finish(accepted=)` holds
-   unchanged — it is the same engine.
+6. **The engine's rules hold under every workflow.** An agent answers with a
+   typed envelope or the phase fails; gates verify its claims against the
+   tree; `writes:` and `protected_files` are enforced in code after every
+   call; every phase carries a description; a run ends through
+   `run.finish(accepted=)` and nowhere else.
 
 ## What is here, and what is not
 
@@ -117,6 +119,6 @@ Three slices: the eight stages; `sdlc`, `quick`, `ship`, `issue` and
 `pr-review`; the loader and runner with the three inputs; the gate CLI;
 doctor; both watchers, `up`, `status`, `kill`, the worktree verbs; the
 justfile; uninstall. Not ported: a `workflow.py` escape hatch — nothing has
-needed one yet, `pr-review` fit the vocabulary with one option. The
-visualizer needs no port — same db, same schema; `just up` and `just obs`
-need `SSSF_SKILL` in `.env` pointing at the sssf skill.
+needed one yet, `pr-review` fit the vocabulary with one option. The trace
+UI ships with the skill under `apps/visualizer`; `just up` and `just obs`
+find it through the `ASF_SKILL` the installer writes into `.env`.

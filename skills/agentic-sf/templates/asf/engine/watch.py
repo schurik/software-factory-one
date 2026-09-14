@@ -41,7 +41,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from . import artifacts, git_helper, hitl, issues, pull_requests, worktree
-from .data_types import Decision, IssueUpdate, PullRequestRef, PullRequestUpdate, SSSFConfig
+from .data_types import Decision, IssueUpdate, PullRequestRef, PullRequestUpdate, FactoryConfig
 from .tracer import watcher_beat as db_beat
 from .utils import anchor, ensure_dir, now_iso, operator_env
 
@@ -81,7 +81,7 @@ def _alive(pid: int) -> bool:
         return True                     # exists, owned by someone else
 
 
-def live_runs(cfg: SSSFConfig, main_root) -> dict[str, int]:
+def live_runs(cfg: FactoryConfig, main_root) -> dict[str, int]:
     """{adw_id: pid} for sessions whose process still exists.
 
     A session row saying `running` is a belief: a SIGKILL or a reboot leaves
@@ -93,7 +93,7 @@ def live_runs(cfg: SSSFConfig, main_root) -> dict[str, int]:
             if _alive(pid)}
 
 
-def beat(cfg: SSSFConfig, main_root, kind: str, status: str, *, project: str = "",
+def beat(cfg: FactoryConfig, main_root, kind: str, status: str, *, project: str = "",
          interval: int = 0, note: str = "") -> None:
     """Say that this watcher exists and what it just did — a file for `asf
     status`, a db row for the trace UI's badge. Never raises."""
@@ -109,7 +109,7 @@ def beat(cfg: SSSFConfig, main_root, kind: str, status: str, *, project: str = "
 
 
 @contextmanager
-def claim(cfg: SSSFConfig, main_root, bucket: str, project: str, number: int):
+def claim(cfg: FactoryConfig, main_root, bucket: str, project: str, number: int):
     """Hold an exclusive claim on one item, or yield False. `flock`, non-blocking,
     held for the whole run and released by the OS even if this process dies."""
     lock_dir = ensure_dir(anchor(main_root, f"{cfg.defaults.data_dir}/{bucket}"))
@@ -154,7 +154,7 @@ def _exit_on_sigterm() -> None:
     signal.signal(signal.SIGTERM, leave)
 
 
-def _loop(kind: str, once, cfg: SSSFConfig, main_root, interval: int) -> int:
+def _loop(kind: str, once, cfg: FactoryConfig, main_root, interval: int) -> int:
     print(f"polling every {interval}s — ctrl-c to stop")
     try:
         while True:
@@ -176,7 +176,7 @@ def _loop(kind: str, once, cfg: SSSFConfig, main_root, interval: int) -> int:
 
 # ── issues ───────────────────────────────────────────────────────────────────
 
-def route(cfg: SSSFConfig, labels: list) -> str:
+def route(cfg: FactoryConfig, labels: list) -> str:
     """Which workflow this issue's labels ask for; "" when none does. The
     routing label is never removed — it is the authorization a human applied."""
     names = _names(labels)
@@ -186,7 +186,7 @@ def route(cfg: SSSFConfig, labels: list) -> str:
     return ""
 
 
-def stale_states(cfg: SSSFConfig, labels: list, keep: str) -> list[str]:
+def stale_states(cfg: FactoryConfig, labels: list, keep: str) -> list[str]:
     """State labels this issue still carries from an EARLIER run, and only ones
     it actually carries: `gh issue edit --remove-label` on a name the repository
     never defined is an error, and it would fail the claim it rides on."""
@@ -195,7 +195,7 @@ def stale_states(cfg: SSSFConfig, labels: list, keep: str) -> list[str]:
     return sorted({name for name in _names(labels) if name in known and name != keep})
 
 
-def flip(cfg: SSSFConfig, main_root, project: str, number: int,
+def flip(cfg: FactoryConfig, main_root, project: str, number: int,
          add: str, remove: list[str]) -> bool:
     result = issues.set_state(main_root, cfg.issues, IssueUpdate(
         number=number, project=project, add_labels=[add], remove_labels=list(remove)))
@@ -204,7 +204,7 @@ def flip(cfg: SSSFConfig, main_root, project: str, number: int,
     return result.ok
 
 
-def issues_once(cfg: SSSFConfig, config_path: str, interval: int = 0) -> int:
+def issues_once(cfg: FactoryConfig, config_path: str, interval: int = 0) -> int:
     main_root = git_helper.main_root()
     project = issues.resolve_project(cfg.issues, main_root)
     if not cfg.issues.enabled:
@@ -268,13 +268,13 @@ def issues_once(cfg: SSSFConfig, config_path: str, interval: int = 0) -> int:
     return 0
 
 
-def issues_loop(cfg: SSSFConfig, config_path: str, interval: int) -> int:
+def issues_loop(cfg: FactoryConfig, config_path: str, interval: int) -> int:
     _exit_on_sigterm()
     return _loop("issues", lambda: issues_once(cfg, config_path, interval), cfg,
                  git_helper.main_root(), interval)
 
 
-def issues_status(cfg: SSSFConfig) -> int:
+def issues_status(cfg: FactoryConfig) -> int:
     main_root = git_helper.main_root()
     project = issues.resolve_project(cfg.issues, main_root)
     print(f"enabled:        {cfg.issues.enabled}")
@@ -300,7 +300,7 @@ def _pr_number(pr_url: str) -> int:
     return int(tail) if tail.isdigit() else 0
 
 
-def mark(cfg: SSSFConfig, main_root, project: str, number: int, add: str = "",
+def mark(cfg: FactoryConfig, main_root, project: str, number: int, add: str = "",
          remove: str = "") -> bool:
     result = pull_requests.set_state(main_root, cfg.pull_requests, PullRequestUpdate(
         number=number, project=project,
@@ -310,7 +310,7 @@ def mark(cfg: SSSFConfig, main_root, project: str, number: int, add: str = "",
     return result.ok
 
 
-def hold(cfg: SSSFConfig, main_root, project: str, number: int) -> None:
+def hold(cfg: FactoryConfig, main_root, project: str, number: int) -> None:
     """Mark a failed pull request; keep this process off it if the mark failed.
     THE LABEL IS THE ONLY BRAKE this path has, and `_HELD` is the weaker fallback."""
     failed = cfg.pull_requests.states.failed
@@ -323,7 +323,7 @@ def hold(cfg: SSSFConfig, main_root, project: str, number: int) -> None:
           f"CLI (`asf doctor`) and restart the watcher")
 
 
-def waiting_on(cfg: SSSFConfig, main_root, number: int) -> str:
+def waiting_on(cfg: FactoryConfig, main_root, number: int) -> str:
     """The session already stopped at a gate on this pull request, or "". Its
     threads are still unresolved — the condition that launched it — and the
     `failed` label cannot guard a run that did exactly what it was asked."""
@@ -335,7 +335,7 @@ def waiting_on(cfg: SSSFConfig, main_root, number: int) -> str:
     return ""
 
 
-def has_work(cfg: SSSFConfig, main_root, project: str, number: int) -> bool:
+def has_work(cfg: FactoryConfig, main_root, project: str, number: int) -> bool:
     """The full read, not the listing: `gh pr list` cannot see review threads."""
     try:
         context = pull_requests.describe(main_root, cfg.pull_requests,
@@ -349,7 +349,7 @@ def has_work(cfg: SSSFConfig, main_root, project: str, number: int) -> bool:
     return bool(threads)
 
 
-def reap(cfg: SSSFConfig, main_root, project: str) -> int:
+def reap(cfg: FactoryConfig, main_root, project: str) -> int:
     """Close out sessions whose pull request has been merged or closed.
 
     Only the factory's own open state is examined — worktrees on disk and
@@ -424,7 +424,7 @@ def _abort_if_waiting(session_dir: Path, number: int, state: str) -> None:
     print(f"    was waiting at gate {waiting.gate} — aborted and recorded")
 
 
-def _release(cfg: SSSFConfig, main_root, adw_id: str, sessions: str) -> None:
+def _release(cfg: FactoryConfig, main_root, adw_id: str, sessions: str) -> None:
     """Re-read after the SIGTERM above: `reclaimable` asks about the status it changed."""
     for info in worktree.inventory(main_root, cfg.worktree, sessions):
         if info.adw_id != adw_id:
@@ -441,7 +441,7 @@ def _release(cfg: SSSFConfig, main_root, adw_id: str, sessions: str) -> None:
         return
 
 
-def prs_once(cfg: SSSFConfig, config_path: str, only: int = 0, interval: int = 0) -> int:
+def prs_once(cfg: FactoryConfig, config_path: str, only: int = 0, interval: int = 0) -> int:
     """One pass: reap what merged, then answer what is outstanding. 3 means the
     pinned pull request is finished — a signal for `loop --pr`, not a failure."""
     main_root = git_helper.main_root()
@@ -520,13 +520,13 @@ def prs_once(cfg: SSSFConfig, config_path: str, only: int = 0, interval: int = 0
     return 0
 
 
-def prs_loop(cfg: SSSFConfig, config_path: str, interval: int, only: int = 0) -> int:
+def prs_loop(cfg: FactoryConfig, config_path: str, interval: int, only: int = 0) -> int:
     _exit_on_sigterm()
     return _loop("prs", lambda: prs_once(cfg, config_path, only, interval), cfg,
                  git_helper.main_root(), interval)
 
 
-def prs_status(cfg: SSSFConfig) -> int:
+def prs_status(cfg: FactoryConfig) -> int:
     main_root = git_helper.main_root()
     pr = cfg.pull_requests
     project = pull_requests.resolve_project(pr, main_root)

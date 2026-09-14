@@ -56,7 +56,7 @@ TAIL_CHARS = 4_000
 # Not a command — a marker. `_run` recognises it and fails the check without
 # spawning anything, which is the whole point: there is no shell string that
 # both fails loudly and cannot be mistaken for a real invocation in the trace.
-UNWIRED = "__sssf_unwired__"
+UNWIRED = "__asf_unwired__"
 EXIT_UNWIRED = 78                  # sysexits.h EX_CONFIG: the configuration is wrong
 
 

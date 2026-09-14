@@ -39,13 +39,9 @@ from .issues import _aim, _run, resolve_project
 THREADS_FILENAME = "pr_review.md"
 
 # The marker every comment this factory writes carries — see `report_body()` and
-# `adw_issue_sdlc._comment()`. A thread whose last word is the factory's own is
+# `inputs.report_pr()`. A thread whose last word is the factory's own is
 # not outstanding work: without this test a run answers its own answer, forever.
 MARKER = "**asf**"
-# sssf's, still skipped: the two factories share a db and may share a repo, and
-# a thread whose last word is either factory's is not outstanding work.
-SSSF_MARKER = "**sssf**"
-OWN_MARKERS = (MARKER, SSSF_MARKER)
 
 # What the receiving agent is told about the text it is being handed. The same
 # job HANDOFF_NOTES does for an issue body, for a different kind of stranger: a
@@ -293,7 +289,7 @@ def actionable(config: PullRequestsConfig,
         and not thread.outdated
         and thread.comments
         and thread.author.lower() not in ignore
-        and not any(mark in (thread.comments[-1].body or "") for mark in OWN_MARKERS)
+        and MARKER not in (thread.comments[-1].body or "")
     ]
     return open_threads[:max(0, config.max_threads)]
 

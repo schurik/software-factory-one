@@ -23,7 +23,7 @@ def test_a_stamped_repo_is_emptied_and_the_repo_s_own_files_are_kept(repo: Path)
     (repo / ".env").write_text((repo / ".env").read_text() + "ANTHROPIC_API_KEY=sk-mine\n")
     (repo / "asf" / "workflows" / "mine").mkdir()
     (repo / "asf" / "workflows" / "mine" / "workflow.yaml").write_text("name: mine\n")
-    db = repo / "adws" / "adw_data" / "sssf.db"
+    db = repo / "asf" / "data" / "asf.db"
     db.parent.mkdir(parents=True)
     db.write_text("")
 
@@ -39,7 +39,7 @@ def test_a_stamped_repo_is_emptied_and_the_repo_s_own_files_are_kept(repo: Path)
     assert done.returncode == 0, done.stdout + done.stderr
     assert not (repo / "asf").exists() and not (repo / "justfile").exists()
     assert not (repo / ".env.sample").exists()
-    assert not db.exists() and not (repo / "adws").exists()   # no sssf here: the record goes
+    assert not db.exists()                                    # the record goes with asf/
     env = (repo / ".env").read_text()
     assert "ANTHROPIC_API_KEY=sk-mine" in env and "ASF_SKILL=" not in env
     assert not (repo / ".gitignore").exists()      # nothing but the block was in it
@@ -48,16 +48,18 @@ def test_a_stamped_repo_is_emptied_and_the_repo_s_own_files_are_kept(repo: Path)
     assert uninstall(repo, "--yes").stdout.startswith("no factory here")
 
 
-def test_the_shared_db_stays_when_sssf_is_stamped_too(repo: Path):
+def test_a_db_pointed_outside_asf_is_deleted_by_name(repo: Path):
     install(repo, "--harness", "pi")
-    (repo / "adws" / "adw_modules").mkdir(parents=True)
-    db = repo / "adws" / "adw_data" / "sssf.db"
-    db.parent.mkdir(parents=True)
+    config = repo / "asf" / "factory.yaml"
+    config.write_text(config.read_text().replace("db: asf/data/asf.db", "db: .trace/asf.db"))
+    db = repo / ".trace" / "asf.db"
+    db.parent.mkdir()
     db.write_text("")
+    db.with_name("asf.db-wal").write_text("")
     done = uninstall(repo, "--yes")
     assert done.returncode == 0, done.stdout + done.stderr
-    assert db.exists() and "shared with sssf" in done.stdout
-    assert not (repo / "asf").exists()
+    assert not db.exists() and not db.with_name("asf.db-wal").exists()
+    assert not (repo / ".trace").exists() and not (repo / "asf").exists()
 
 
 def test_run_worktrees_go_and_branches_stay_unless_asked(repo: Path):

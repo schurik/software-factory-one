@@ -25,11 +25,10 @@ hitl:
   when_unattended: suspend         # suspend | auto
   notify_command: []               # run on suspend, subject on stdin
 
-# The trace. SHARED WITH SSSF ON PURPOSE: both factories write the same
-# schema, so one db and one visualizer show every run side by side. Point it
-# elsewhere if sssf is not installed and you would rather keep it under asf/.
+# The trace: every run streams into this SQLite db, and `just obs` shows it.
+# Under asf/data/ by default, so it is runtime the installer already ignores.
 observability:
-  db: adws/adw_data/sssf.db
+  db: asf/data/asf.db
   poll_ms: 500
 
 # Every run gets its own git worktree on its own branch, cut from a base ref

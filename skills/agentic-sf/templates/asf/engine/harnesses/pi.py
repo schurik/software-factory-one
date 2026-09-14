@@ -91,7 +91,7 @@ def resolve_model(pattern: str) -> tuple[str, str]:
     """Resolve a model pattern to an explicit ``(provider, model_id)`` pair.
 
     Pi's catalog merges built-in models with ``~/.pi/agent/models.json``. Using
-    that same merged view lets SSSF target direct providers such as
+    that same merged view lets the factory target direct providers such as
     ``openai/gpt-5.6-terra`` without re-registering built-in models locally.
     """
     catalog = [(provider, model_id) for provider, model_id, _ in _pi_catalog()]
@@ -217,7 +217,7 @@ def new_session_id(adw_id: str, agent: AgentConfig) -> str:
     """A fresh pi session id. Random, because pi's ids are create-or-continue:
     a deterministic one would silently rejoin a context window from an earlier
     run whenever the agent map went missing."""
-    return f"sssf-{adw_id}-{agent.name}-{new_id(4)}"
+    return f"asf-{adw_id}-{agent.name}-{new_id(4)}"
 
 
 def _turn_usage(usage: dict, total_tokens: int) -> UsageBreakdown:

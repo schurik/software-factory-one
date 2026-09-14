@@ -1,4 +1,4 @@
-"""Concrete data types for the SSSF ADW system.
+"""Concrete data types for the asf engine.
 
 RULE (four-param rule): any function that takes more than 4 parameters takes
 ONE of these objects instead. AgentCall and PhaseParams are the pattern.
@@ -694,7 +694,7 @@ def _switch(value: Any) -> Any:
 
 
 class ObservabilityConfig(BaseModel):
-    db: str = "asf/data/sssf.db"
+    db: str = "asf/data/asf.db"
     poll_ms: int = 500
 
 
@@ -706,10 +706,10 @@ class IssueStates(BaseModel):
     look. Two watchers racing the same issue means one of them loses the flip.
     """
 
-    queued: str = "sssf:queued"
-    running: str = "sssf:running"
-    done: str = "sssf:done"
-    failed: str = "sssf:failed"
+    queued: str = "asf:queued"
+    running: str = "asf:running"
+    done: str = "asf:done"
+    failed: str = "asf:failed"
 
 
 class IssuesConfig(BaseModel):
@@ -758,7 +758,7 @@ class PullRequestStates(BaseModel):
     failing run every poll, forever. A human removing the label is the restart.
     """
 
-    failed: str = "sssf:pr-failed"
+    failed: str = "asf:pr-failed"
 
 
 class PullRequestsConfig(BaseModel):
@@ -811,7 +811,7 @@ class PullRequestsConfig(BaseModel):
     states: PullRequestStates = Field(default_factory=PullRequestStates)
 
 
-class SSSFConfig(BaseModel):
+class FactoryConfig(BaseModel):
     defaults: ConfigDefaults = Field(default_factory=ConfigDefaults)
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     hitl: HitlConfig = Field(default_factory=HitlConfig)
@@ -841,7 +841,7 @@ class Workspace(BaseModel):
     main_root: Path
     repo_root: Path
     enabled: bool = False           # False = running directly in the main checkout
-    branch: str = ""                # sssf/<adw_id>
+    branch: str = ""                # asf/<adw_id>
     base_ref: str = ""              # what it was cut from, as asked for
     base_commit: str = ""           # ...pinned to a sha at creation
     created: bool = False           # False = re-attached to a worktree that existed
@@ -952,7 +952,7 @@ class RunSpec(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    cfg: SSSFConfig
+    cfg: FactoryConfig
     adw_id: str
     engineer: str
     workspace: Workspace

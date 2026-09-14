@@ -22,7 +22,7 @@ filterwarnings = ["error::DeprecationWarning"]
 # The factory's modules carry long explanatory comments and wide call sites;
 # 100 is what the existing code was written to.
 line-length = 100
-extend-exclude = ["skills/sssf/apps"]      # the visualizer is TypeScript
+extend-exclude = ["skills/sssf/apps", "skills/agentic-sf/apps"]      # the visualizers are TypeScript
 
 [tool.ruff.lint]
 # Pyflakes plus the pycodestyle errors that are real bugs (E4 imports,

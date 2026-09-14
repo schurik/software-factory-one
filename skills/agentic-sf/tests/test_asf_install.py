@@ -38,7 +38,7 @@ def test_a_fresh_repo_is_stamped_and_its_workflows_check(repo: Path):
 def test_the_runtime_and_the_worktrees_are_gitignored(repo: Path):
     install(repo, "--harness", "pi")
     ignored = (repo / ".gitignore").read_text().splitlines()
-    for entry in ("asf/data/", "adws/adw_data/sssf.db*", ".asf-worktrees/", ".env"):
+    for entry in ("asf/data/", ".asf-worktrees/", ".env"):
         assert entry in ignored
     git(repo, "add", "-A")
     staged = git(repo, "diff", "--cached", "--name-only").splitlines()
@@ -68,9 +68,9 @@ def test_an_unknown_or_unstampable_harness_is_refused(repo: Path):
 
 
 def test_a_foreign_justfile_is_left_alone_and_ours_lands_beside_it(repo: Path):
-    (repo / "justfile").write_text("# sssf starter recipes\ndefault:\n    @just --list\n")
+    (repo / "justfile").write_text("# my own recipes\ndefault:\n    @just --list\n")
     result = install(repo, "--harness", "claude_code")
     assert result.returncode == 0
-    assert (repo / "justfile").read_text().startswith("# sssf starter recipes")
+    assert (repo / "justfile").read_text().startswith("# my own recipes")
     assert (repo / "asf.justfile").read_text().startswith("# agentic-sf recipes.")
     assert "just -f asf.justfile" in result.stdout

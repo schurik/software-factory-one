@@ -20,7 +20,8 @@ workflow with `input: issue` is any chain of stages with a tracker at both
 ends.
 
 THE TEXT IS UNTRUSTED, and this module is one of the places that keeps it
-so. sssf's `adw_issue_sdlc` spells the whole argument out; the parts that
+so. It is written by whoever can file an issue or review a pull request, and
+it reaches agents holding `bash`, `write` and a checkout. The parts that
 live here are: the body is an ARTIFACT, never interpolated into a prompt;
 `trusted_authors` / `trusted_reviewers` are checked before anything spends;
 and `run.record_issue` is what makes `integration` refuse to move the base
@@ -36,7 +37,7 @@ from typing import Optional
 
 from . import git_helper, hitl, issues, pull_requests
 from .data_types import (EnvelopeBase, IssueRef, IssueUpdate, PhaseParams, PullRequestRef,
-                         PullRequestUpdate, SSSFConfig)
+                         PullRequestUpdate, FactoryConfig)
 
 KINDS = ("prompt", "issue", "pr")
 REFUSED = 2                                  # nothing spent, nothing recorded
@@ -65,7 +66,7 @@ def number_of(request: str, kind: str) -> int:
 
 # ── issue ────────────────────────────────────────────────────────────────────
 
-def open_issue(run, cfg: SSSFConfig, number: int) -> Opened:
+def open_issue(run, cfg: FactoryConfig, number: int) -> Opened:
     """Read the work item, bind the run to it, refuse an untrusted author."""
     with run.phase(PhaseParams(name="issue", kind="code", owner="tracker",
                                description="Read the reporter's own words and labels, "
@@ -88,7 +89,7 @@ def open_issue(run, cfg: SSSFConfig, number: int) -> Opened:
     return Opened(prompt=prompt, previous=issues.as_envelope(issue), context=issue)
 
 
-def report_issue(run, cfg: SSSFConfig, opened: Opened, accepted: bool) -> None:
+def report_issue(run, cfg: FactoryConfig, opened: Opened, accepted: bool) -> None:
     """Tell the reporter what happened and where the work went. Never raises."""
     issue = opened.context
     with run.phase(PhaseParams(name="report", kind="code", owner="tracker",
@@ -125,7 +126,7 @@ def session_of(branch: str, prefix: str) -> str:
     return branch.removeprefix(prefix) if branch.startswith(prefix) else ""
 
 
-def locate_pr(cfg: SSSFConfig, number: int, adw_id: Optional[str]) -> tuple[str, object]:
+def locate_pr(cfg: FactoryConfig, number: int, adw_id: Optional[str]) -> tuple[str, object]:
     """Which session a pull request belongs to — decided BEFORE a session exists.
 
     A refusal here costs one graphql call and leaves no trace rows, no
@@ -157,7 +158,7 @@ def locate_pr(cfg: SSSFConfig, number: int, adw_id: Optional[str]) -> tuple[str,
     return resolved, context
 
 
-def open_pr(run, cfg: SSSFConfig, context) -> Opened:
+def open_pr(run, cfg: FactoryConfig, context) -> Opened:
     """Attach the threads to the run, refuse an untrusted reviewer."""
     with run.phase(PhaseParams(name="pr", kind="code", owner="review",
                                description="Read the reviewers' own words and where each "
@@ -190,7 +191,7 @@ def open_pr(run, cfg: SSSFConfig, context) -> Opened:
                   context=context, threads=threads, head=head)
 
 
-def report_pr(run, cfg: SSSFConfig, opened: Opened, accepted: bool, reason: str) -> str:
+def report_pr(run, cfg: FactoryConfig, opened: Opened, accepted: bool, reason: str) -> str:
     """Answer each thread, resolve the addressed ones, comment once. The outcome.
 
     THREE OUTCOMES, NOT TWO. `addressed` is a commit on the branch and the
@@ -215,11 +216,14 @@ def report_pr(run, cfg: SSSFConfig, opened: Opened, accepted: bool, reason: str)
     return outcome
 
 
-def _write_back(run, cfg: SSSFConfig, context, threads, outcome: str, reason: str) -> dict:
-    """ONLY `addressed` RESOLVES — see sssf's adw_pr_review for the argument:
-    `unfinished` hides outstanding work behind a checkmark, and `declined` is a
+def _write_back(run, cfg: FactoryConfig, context, threads, outcome: str, reason: str) -> dict:
+    """ONLY `addressed` RESOLVES. A resolved thread tells a reviewer their ask
+    is handled, and two of the three outcomes have not handled it: `unfinished`
+    would hide outstanding work behind a checkmark, and `declined` is a
     judgement the reviewer gets to agree with, so the thread stays open with
-    the reason in it. The reply goes out on all three."""
+    the reason in it. The reply goes out on all three — being told "this was
+    picked up, and here is what happened" is the useful half even when no
+    diff came of it."""
     config = cfg.pull_requests
     replied = resolved = 0
     notes: list[str] = []
@@ -273,7 +277,7 @@ def quoted(text: str, limit: int = 700) -> str:
 
 # ── the label a re-entered issue run lands ───────────────────────────────────
 
-def land_label(cfg: SSSFConfig, main_root, state, code: int) -> None:
+def land_label(cfg: FactoryConfig, main_root, state, code: int) -> None:
     """Move an issue-triggered run's label now that THIS process has ended it.
 
     The watcher launched the run and saw exit 75 (a gate), so it left the issue

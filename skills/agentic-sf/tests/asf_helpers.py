@@ -18,7 +18,7 @@ from engine import frontmatter      # conftest puts templates/asf on the path fi
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 INSTALL = SKILL_ROOT / "scripts" / "install.py"
-DB = "adws/adw_data/sssf.db"
+DB = "asf/data/asf.db"
 
 
 def git(cwd: Path, *args: str) -> str:
