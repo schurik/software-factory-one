@@ -20,13 +20,32 @@ or a path to a prompt file**, so `just do plan.md` works.
 
 `just list` prints what this repo has. What ships:
 
-| Workflow | Stages | For |
-|---|---|---|
-| `quick` | implement → verify → commit | a change one sentence describes |
-| `sdlc` | plan → implement → verify → commit | work whose shape is clear enough to plan in one pass — **the default** |
-| `ship` | scout → plan → implement → verify → review → document → integrate | work whose shape is not obvious; three commits, landed |
-| `issue` | scouted, planned, built, verified, reviewed, documented | a tracked work item, proposed as a pull request |
-| `pr-review` | implement → verify → commit | answering the review threads on one of this factory's pull requests |
+Stage names below are exactly what `just check` prints, so the two can be
+compared line for line.
+
+| Workflow | Input | Stages | For |
+|---|---|---|---|
+| `quick` | prompt | implement → verify → commit | a change one sentence describes |
+| `pr-review` | pr | implement → verify → commit | answering the review threads on one of this factory's pull requests |
+| `sdlc` | prompt | plan → implement → verify → commit | work whose shape is clear enough to plan in one pass — **the default** |
+| `ship` | prompt | scout → plan → commit → implement → verify → review → commit → document → commit → integrate | work whose shape is not obvious; three commits, landed |
+| `issue` | issue | the same ten stages as `ship` | a tracked work item, proposed as a pull request |
+
+`ship` and `issue` are the same ten stages with the same options, and `input:`
+is the only difference between them. That is the point: an issue chain is not a
+different pipeline, it is `ship` fed by the tracker — which is why adding an
+input never needs a new stage.
+
+`quick` and `pr-review` share the three stage *names* but not their settings.
+`pr-review` allows three fix loops rather than two, sets `allow_clean` on its
+commit (a review thread answered by changing nothing is not a failed run), and
+carries its own `tasks/implement.md` — the shipped example of a workflow
+overriding a stage's task. Read the `workflow.yaml` before assuming two chains
+that print alike behave alike.
+
+The three `commit` stages in the long chain are why `ship` and `issue` land
+three commits rather than one: the plan, the implementation and the docs each
+land in the words of the agent that produced them.
 
 `just check <name>` loads and validates one without spawning anything.
 
