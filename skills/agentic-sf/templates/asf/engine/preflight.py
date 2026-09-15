@@ -302,10 +302,10 @@ def skill() -> list[Finding]:
     if not raw:
         return [Finding(
             check="ASF_SKILL", level="warn",
-            detail="unset — re-installing or upgrading the factory needs to know "
-                   "where the skill is",
+            detail="unset — `just up` and `just obs` start without the trace UI, and "
+                   "re-installing or upgrading the factory cannot find the skill",
             fix="re-run install.py from the target repo root; it writes the path "
-                "into .env")]
+                "into .env. A repo cloned without its (gitignored) .env lands here")]
     root = Path(raw).expanduser()
     if not (root / "scripts" / "install.py").is_file():
         return [Finding(
@@ -327,8 +327,42 @@ def port_free(port: int) -> bool:
             return False
 
 
+def visualizer_dir() -> Path | None:
+    """Where the trace UI lives, or None when this repo cannot reach it.
+
+    The visualizer ships with the SKILL, not with the stamp, so both `up` and
+    `doctor` find it through the `ASF_SKILL` the installer wrote into `.env` —
+    and a repo cloned without that (gitignored) `.env` cannot. It lives here,
+    not in `supervise.py`, so that `doctor` asks the identical question `up`
+    acts on; asking a cheaper one is how doctor came to print a ✓ for a UI that
+    could not start.
+    """
+    skill_root = os.environ.get("ASF_SKILL", "").strip()
+    if not skill_root:
+        return None
+    home = Path(skill_root).expanduser() / "apps" / "visualizer"
+    return home if (home / "server" / "index.ts").is_file() else None
+
+
 def trace_ui() -> list[Finding]:
-    """Whether `just obs` could start the trace UI over the trace db."""
+    """Whether `just up` / `just obs` could start the trace UI over the trace db.
+
+    Reachability first: `up` drops the UI and keeps going whenever the
+    visualizer cannot be found, and a green check that only means "bun is
+    installed" points the operator away from the one thing that is wrong.
+    """
+    home = visualizer_dir()
+    if home is None:
+        raw = os.environ.get("ASF_SKILL", "").strip()
+        return [Finding(
+            check="trace UI", level="warn",
+            detail=("ASF_SKILL is unset, so `just up` and `just obs` start without the "
+                    "trace UI — the watchers run, the UI is silently skipped") if not raw
+                   else (f"no visualizer under {Path(raw).expanduser() / 'apps' / 'visualizer'} "
+                         f"— ASF_SKILL does not point at the skill directory, so `just up` "
+                         f"and `just obs` start without the trace UI"),
+            fix="re-run install.py from the target repo root, or set ASF_SKILL in .env to "
+                "the skill directory (the visualizer is its apps/visualizer)")]
     if not shutil.which("bun"):
         return [Finding(check="trace UI", level="warn",
                         detail="bun is not on PATH — `just obs` cannot start the trace UI",
@@ -339,7 +373,7 @@ def trace_ui() -> list[Finding]:
             detail=f"something already listens on :{API_PORT} — another trace UI, or "
                    f"an api server orphaned by an older `just obs`",
             fix=f"lsof -ti :{API_PORT} | xargs kill")]
-    return [Finding(check="trace UI", detail=f"bun present, :{API_PORT} free")]
+    return [Finding(check="trace UI", detail=f"{home}, bun present, :{API_PORT} free")]
 
 
 # ── composition ──────────────────────────────────────────────────────────────

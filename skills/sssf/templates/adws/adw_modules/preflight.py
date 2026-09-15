@@ -304,7 +304,8 @@ def skill() -> list[Finding]:
         return [Finding(
             check="SSSF_SKILL", level="warn",
             detail="unset — `just up`, `just status`, `just issues`, `just prs`, "
-                   "`just kill` and `just worktrees` cannot resolve their scripts",
+                   "`just kill` and `just worktrees` cannot resolve their scripts, and "
+                   "the trace UI ships there too",
             fix="re-run install.py from the target repo root; it writes the path "
                 "into .env")]
     root = Path(raw).expanduser()
@@ -328,8 +329,37 @@ def port_free(port: int) -> bool:
             return False
 
 
+def visualizer_dir() -> Path | None:
+    """Where the trace UI lives, or None when this repo cannot reach it.
+
+    The visualizer ships with the SKILL, not with the stamp, so `up.py` is
+    reached through the `SSSF_SKILL` the installer wrote into `.env` — and a
+    repo cloned without that (gitignored) `.env` cannot reach either.
+    """
+    skill_root = os.environ.get("SSSF_SKILL", "").strip()
+    if not skill_root:
+        return None
+    home = Path(skill_root).expanduser() / "apps" / "visualizer"
+    return home if (home / "server" / "index.ts").is_file() else None
+
+
 def trace_ui() -> list[Finding]:
-    """Whether `just up` would be able to start the visualizer."""
+    """Whether `just up` would be able to start the visualizer.
+
+    Reachability first: a ✓ that only means "bun is installed" is worse than no
+    check at all, because the UI starting is not what it was answering.
+    """
+    home = visualizer_dir()
+    if home is None:
+        raw = os.environ.get("SSSF_SKILL", "").strip()
+        return [Finding(
+            check="trace UI", level="warn",
+            detail=("SSSF_SKILL is unset, so `just up` cannot reach the visualizer that "
+                    "ships with the skill") if not raw
+                   else (f"no visualizer under {Path(raw).expanduser() / 'apps' / 'visualizer'} "
+                         f"— SSSF_SKILL does not point at the skill directory"),
+            fix="re-run install.py from the target repo root, or set SSSF_SKILL in .env to "
+                "the skill directory (the visualizer is its apps/visualizer)")]
     if not shutil.which("bun"):
         return [Finding(check="trace UI", level="warn",
                         detail="bun is not on PATH — `just up` starts the watchers "
@@ -341,7 +371,7 @@ def trace_ui() -> list[Finding]:
             detail=f"something already listens on :{API_PORT} — another `just up`, or "
                    f"an api server orphaned by an older `just obs`",
             fix=f"lsof -ti :{API_PORT} | xargs kill")]
-    return [Finding(check="trace UI", detail=f"bun present, :{API_PORT} free")]
+    return [Finding(check="trace UI", detail=f"{home}, bun present, :{API_PORT} free")]
 
 
 # ── composition ──────────────────────────────────────────────────────────────

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
-from .asf_helpers import asf, git, install
+from .asf_helpers import SKILL_ROOT, asf, git, install
 
 STAMPED = ["asf/asf.py", "asf/factory.yaml", "asf/engine/session.py", "asf/engine/workflow.py",
            "asf/stages/plan/stage.py", "asf/stages/plan/task.md", "asf/stages/verify/fix.md",
@@ -43,6 +44,30 @@ def test_the_runtime_and_the_worktrees_are_gitignored(repo: Path):
     git(repo, "add", "-A")
     staged = git(repo, "diff", "--cached", "--name-only").splitlines()
     assert not [p for p in staged if p.startswith("asf/data/") or p == ".env"]
+
+
+def test_a_vendored_skill_keeps_its_visualizer_s_node_modules_out_of_the_host(repo: Path):
+    """`up` runs `bun install` inside the SKILL, and a repo that VENDORS the
+    skill (`.agents/skills/…`) has that tree in its own working copy.
+
+    A run on a worktree never sees it — a fresh checkout does not carry main's
+    untracked files. Under `worktree.enabled: false` it does: the commit stage
+    stages `run.repo_root`, which is then the main checkout, and `git add -A`
+    sweeps up every package. One flag is not an invariant, and the rule ships
+    with the directory, so it holds wherever the skill is checked out and
+    whether or not install.py ever touched the host .gitignore.
+    """
+    install(repo, "--harness", "claude_code")
+    vendored = repo / ".agents" / "skills" / "agentic-sf" / "apps" / "visualizer"
+    vendored.parent.mkdir(parents=True)
+    shutil.copytree(SKILL_ROOT / "apps" / "visualizer", vendored)
+    (vendored / "node_modules" / "vue").mkdir(parents=True)
+    (vendored / "node_modules" / "vue" / "package.json").write_text("{}\n")
+
+    git(repo, "add", "-A")
+    staged = git(repo, "diff", "--cached", "--name-only").splitlines()
+    assert not [path for path in staged if "node_modules" in path]
+    assert f"{vendored.relative_to(repo).as_posix()}/.gitignore" in staged   # and it travels
 
 
 def test_a_second_install_skips_and_force_keeps_the_operator_s_config(repo: Path):

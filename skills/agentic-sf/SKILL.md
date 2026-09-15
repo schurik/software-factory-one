@@ -31,7 +31,9 @@ The directory this `SKILL.md` lives in. Substitute it, never the literal
 Two steps. Then stop.
 
 1. If `asf/factory.yaml` does not exist, say in one line that the factory is
-   not installed here and offer the install cookbook. Otherwise:
+   not installed here and offer [cookbooks/install.md](cookbooks/install.md).
+   Stamping it by hand instead of running `install.py` is how a repo ends up
+   with `asf/` but no `.env` — read the cookbook. Otherwise:
 2. Run `just list` (or `uv run asf/asf.py list`) and print it — one line per
    workflow, name and description — and **wait for the engineer's request.**
 
@@ -71,16 +73,20 @@ downgrades a configured merge to a pull request on those inputs, in code.
 
 ## Request routing
 
+Commands are inline; three rows carry a cookbook as well, and those are the
+three whose answer is a decision process rather than a command. Read it before
+acting, not after.
+
 | Request | Do |
 |---|---|
-| install / set up the factory here | `uv run <skill>/scripts/install.py --harness claude_code\|pi`, then `just doctor` |
-| "is this repo ready to run?" / something failed before the first phase | `just doctor` — every check with its fix, then every workflow checked; spawns nothing |
-| run a workflow | `just do "<prompt>"` (sdlc), `just quick`, `just ship`, or `just run <name> "<prompt>" [--hitl all\|none\|plan]` |
+| install / set up the factory here | [cookbooks/install.md](cookbooks/install.md) — **read it first**: four decisions belong to the repo, and `install.py` is the only supported way in. Then `uv run <skill>/scripts/install.py --harness claude_code\|pi` and `just doctor` |
+| "is this repo ready to run?" / something failed before the first phase | `just doctor` — every check with its fix, then every workflow checked; spawns nothing. [cookbooks/install.md](cookbooks/install.md#post-install-checklist) |
+| run a workflow | `just do "<prompt>"` (sdlc), `just quick`, `just ship`, or `just run <name> "<prompt>" [--hitl all\|none\|plan]` — turning the request into a prompt, watching it, gates, failures: [cookbooks/run_workflow.md](cookbooks/run_workflow.md) |
 | work a tracked issue / answer a review | `just issue 42`, `just pr-review 17` — the number, never a prompt; the run reports back on the issue or in the threads |
 | start the watchers / "is anything polling?" | `just up` (both watchers + trace UI, ctrl-c stops all), `just status`; one poll: `just issues`, `just prs`; cron form: `just issues-watch`, `just prs-watch`. Turn them on in `factory.yaml` (`issues.enabled`, `issues.route`, `pull_requests.enabled`) |
 | stop a run | `just kill <id>` — agents first, then the workflow; `--force` SIGKILLs |
 | tidy up | `just worktrees`, `just worktrees-prune [--force]`, `just worktrees-remove <id>`; branches are never deleted |
-| remove the factory from this repo | `just uninstall [--dry-run]` — the skill is untouched; the run record goes with `asf/` |
+| remove the factory from this repo | [cookbooks/uninstall.md](cookbooks/uninstall.md) — `just uninstall --dry-run` first and show the plan; the skill is untouched, the run record goes with `asf/`, and it is the one irreversible thing here |
 | which workflows exist / what does X do | `uv run asf/asf.py list`; read `asf/workflows/<name>/workflow.yaml` |
 | is this workflow runnable | `uv run asf/asf.py check <name>` — spawns nothing, names every problem |
 | create a workflow | copy the closest directory under `asf/workflows/`, edit `workflow.yaml`, run `check`. Read [references/design.md](references/design.md#workflows) first |
