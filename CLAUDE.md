@@ -100,7 +100,10 @@ bug already shipped once.
 - **The `fake` harness is the development tool.** Put a new chain's roster on it until the shape
   holds; it is never offered by the installer.
 - **Installers are idempotent.** A second run skips what exists and reports it (a drift check).
-  `--force` overwrites *everything* stamped, config and prompts included.
+  `--force` overwrites everything stamped, prompts and agent prose included — with one
+  deliberate exception: the assembled config (`sssf.config.yaml`, `factory.yaml`) is never
+  rewritten. A fresh render that differs lands beside it as `.new` and is named loudly, because
+  the file the installer told the operator to own is the one `--force` must not eat.
 - **Runtime must stay gitignored.** CI fails the install if `adws/adw_data/sessions/`, `asf/data/`,
   `.sssf-worktrees/`, `.asf-worktrees/` or `.pyc` files end up staged — a chain's commit phase runs
   `git add -A` in the user's repo.
