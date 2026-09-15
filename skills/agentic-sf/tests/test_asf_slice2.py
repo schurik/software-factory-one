@@ -183,7 +183,30 @@ def test_doctor_names_every_placeholder_and_checks_every_workflow(stamped: Path)
     for name in ("quick", "sdlc", "ship"):
         assert f"✓ {name}:" in result.stdout
 
+    # `stamped` has ASF_SKILL, so whatever else the machine lacks (bun, a free
+    # :4600), reaching the visualizer is not what the trace UI complains about.
+    trace = next(line for line in result.stdout.splitlines() if "trace UI" in line)
+    assert "ASF_SKILL" not in trace
+
     # `--config` is accepted after the subcommand too; a wrong one is refused.
     assert asf(stamped, "list", "--config", "asf/factory.yaml").returncode == 0
     missing = asf(stamped, "doctor", "--config", "asf/nope.yaml")
     assert missing.returncode != 0 and "no config at asf/nope.yaml" in missing.stderr
+
+
+def test_doctor_will_not_tick_a_trace_ui_that_cannot_start(stamped: Path):
+    """The bug this exists for: with ASF_SKILL unset the visualizer is
+    unreachable, `up` drops it silently — and doctor printed `✓ trace UI` on
+    the strength of bun being installed, pointing away from the one thing
+    wrong. Empty rather than deleted because load_dotenv does not override."""
+    fake_roster(stamped)
+    result = asf(stamped, "doctor", env={"ASF_SKILL": ""})
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "✓ trace UI" not in result.stdout
+    assert "~ trace UI" in result.stdout
+    for line in result.stdout.splitlines():
+        if "trace UI" in line:
+            assert "just up" in line and "just obs" in line
+    # and the ASF_SKILL finding names the visualizer, not only re-installing
+    skill_line = next(line for line in result.stdout.splitlines() if "ASF_SKILL" in line)
+    assert "trace UI" in skill_line

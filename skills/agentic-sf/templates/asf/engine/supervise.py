@@ -8,8 +8,11 @@ every child, prefixes their output, restarts what dies, and takes the whole
 tree down with it. NOT A DAEMON — the terminal it runs in is the handle.
 
 The trace UI ships with the skill (`apps/visualizer`), reached through the
-`ASF_SKILL` the installer wrote into `.env`. Absent, `up` runs without it and
-says so; the watchers are the part that must not be forgotten.
+`ASF_SKILL` the installer wrote into `.env` (`preflight.visualizer_dir()`, so
+`doctor` answers from the same place). Absent, `up` runs without it and says
+so as a WARNING — a service that silently did not start looks exactly like a
+service with nothing to say; the watchers are the part that must not be
+forgotten.
 
 `status` answers the other half: is anything running right now, and did it
 poll recently — from the watcher heartbeat FILES and a probe of each pid, so a
@@ -37,7 +40,7 @@ RUNNER = "asf/asf.py"
 API_PORT = int(os.environ.get("PORT", "4600"))
 UI_PORT = 4601
 COLORS = {"obs": "\033[36m", "ui": "\033[35m", "issues": "\033[33m", "prs": "\033[32m"}
-DIM, RESET = "\033[2m", "\033[0m"
+DIM, WARN, RESET = "\033[2m", "\033[33m", "\033[0m"
 
 
 def paint(color: str, text: str) -> str:
@@ -93,14 +96,6 @@ def _stop(service: Service, grace: float = 8.0) -> None:
         pass
 
 
-def visualizer_dir() -> Path | None:
-    skill = os.environ.get("ASF_SKILL", "").strip()
-    if not skill:
-        return None
-    home = Path(skill) / "apps" / "visualizer"
-    return home if (home / "server" / "index.ts").is_file() else None
-
-
 def wanted(cfg: FactoryConfig, only: str) -> set[str]:
     if only:
         chosen = {part.strip() for part in only.split(",") if part.strip()}
@@ -122,22 +117,23 @@ def wanted(cfg: FactoryConfig, only: str) -> set[str]:
 def check(cfg: FactoryConfig, want: set[str]) -> list[str]:
     """What would stop THESE services. Non-fatal findings drop the service."""
     if "obs" in want:
-        home = visualizer_dir()
+        home = preflight.visualizer_dir()
         if home is None:
-            print(paint(DIM, "  ~ no trace UI: ASF_SKILL in .env must point at the skill "
-                             "directory (the visualizer ships there) — install.py writes it"))
+            print(paint(WARN, "  ! no trace UI: ASF_SKILL in .env must point at the skill "
+                              "directory (the visualizer ships there) — install.py writes "
+                              "it, and a clone without its .env has none"))
             want.discard("obs")
         elif not shutil.which("bun"):
-            print(paint(DIM, "  ~ bun is not on PATH — starting without the trace UI"))
+            print(paint(WARN, "  ! bun is not on PATH — starting without the trace UI"))
             want.discard("obs")
         elif not preflight.port_free(API_PORT):
-            print(paint(DIM, f"  ~ something already listens on :{API_PORT} — starting "
-                             f"without the trace UI: `lsof -ti :{API_PORT} | xargs kill`"))
+            print(paint(WARN, f"  ! something already listens on :{API_PORT} — starting "
+                              f"without the trace UI: `lsof -ti :{API_PORT} | xargs kill`"))
             want.discard("obs")
     forge = (cfg.issues.list_command or ["gh"])[0]
     if want & {"issues", "prs"} and not shutil.which(forge):
-        print(paint(DIM, f"  ~ {forge!r} is not on PATH — the watchers can start, but every "
-                         f"poll will fail to list anything"))
+        print(paint(WARN, f"  ! {forge!r} is not on PATH — the watchers can start, but every "
+                          f"poll will fail to list anything"))
     return ["nothing to start — see the messages above"] if not want else []
 
 
@@ -145,7 +141,7 @@ def services(want: set[str], config_path: str, interval: int, main_root: Path,
              db: Path) -> list[Service]:
     found: list[Service] = []
     if "obs" in want:
-        home = visualizer_dir()
+        home = preflight.visualizer_dir()
         found.append(Service("obs", ["bun", "run", "server/index.ts"], home,
                              {"ASF_DB": str(db), "PORT": str(API_PORT)}))
         found.append(Service("ui", ["bunx", "vite"], home, {"PORT": str(API_PORT)}))
@@ -172,7 +168,7 @@ def up(cfg: FactoryConfig, config_path: str, interval: int, only: str) -> int:
             from .tracer import ensure_db
             ensure_db(db).close()
             print(f"  {paint(DIM, 'no trace db yet — created an empty one')}")
-        home = visualizer_dir()
+        home = preflight.visualizer_dir()
         if home is not None and not (home / "node_modules").is_dir():
             print("  installing the visualizer's dependencies (first run only)…")
             subprocess.run(["bun", "install"], cwd=home, check=False)

@@ -1,0 +1,13 @@
+# The visualizer's build junk, ignored HERE rather than in the host repo's
+# .gitignore — because this tree travels. A target repo that VENDORS the skill
+# (`.agents/skills/…`) has it inside its own working copy, where `up`'s
+# first-run `bun install` lands ~50 packages in that repo's `git status`.
+# Under `worktree.enabled: false` it is worse than untidy: the commit stage
+# stages `run.repo_root`, which is then the main checkout, and `git add -A`
+# commits every one of them — a single flag between `just up` and 50 packages
+# in the engineer's history. A rule that ships with the directory holds
+# wherever the skill is checked out, install.py run or not.
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo

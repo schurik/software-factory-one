@@ -142,13 +142,19 @@ def ensure_gitignore(root: Path, stamped: list) -> None:
         stamped.append(f"{gitignore} (+{len(missing)} entries)")
 
 
-def ensure_env(root: Path, sample: Path, stamped: list, notes: list) -> None:
+def ensure_env(root: Path, sample: Path, stamped: list, notes: list) -> bool:
+    """Whether `.env` ends up carrying a usable ASF_SKILL.
+
+    False is not cosmetic: unset, `just up` and `just obs` start without the
+    trace UI and `just uninstall` cannot find the skill at all — so main()
+    says it loudly rather than leaving it to `doctor`.
+    """
     env = root / ".env"
     if not env.exists() and sample.exists():
         env.write_text(sample.read_text())
         stamped.append(str(env))
     if not env.exists():
-        return
+        return False
     lines = env.read_text().splitlines()
     for index, line in enumerate(lines):
         if not line.startswith("ASF_SKILL="):
@@ -161,10 +167,11 @@ def ensure_env(root: Path, sample: Path, stamped: list, notes: list) -> None:
         elif Path(current).resolve() != SKILL_ROOT:
             notes.append(f"ASF_SKILL in .env is {current}, but this install ran from "
                          f"{SKILL_ROOT} — left as it is")
-        return
+        return True
     with env.open("a") as f:
         f.write(f"\nASF_SKILL={SKILL_ROOT}\n")
     notes.append(f"ASF_SKILL={SKILL_ROOT}  (appended to .env)")
+    return True
 
 
 def main() -> int:
@@ -186,7 +193,7 @@ def main() -> int:
     stamp(HARNESSES / harness / "env.sample", root / ".env.sample", args.force, stamped, skipped)
     justfile_note = stamp_justfile(root, args.force, stamped, skipped)
     ensure_gitignore(root, stamped)
-    ensure_env(root, root / ".env.sample", stamped, notes)
+    skill_in_env = ensure_env(root, root / ".env.sample", stamped, notes)
 
     quality_py = root / "asf" / "engine" / "quality.py"
     detecting = not args.no_detect_quality and str(quality_py) in stamped
@@ -219,6 +226,10 @@ def main() -> int:
             print(f"\nstill unwired: {', '.join(unwired)} — a verify stage that names one "
                   f"of these FAILS rather than passing.\n    write the real argv into "
                   f"asf/engine/quality.py")
+    if not skill_in_env:
+        print(f"\n  ! NO .env, SO ASF_SKILL IS UNSET — `just up` and `just obs` will start "
+              f"the watchers\n    without the trace UI, and `just uninstall` cannot find "
+              f"the skill.\n    write it yourself:  echo 'ASF_SKILL={SKILL_ROOT}' >> .env")
     print("\nnext:  just doctor        then  just do \"<prompt>\"   (or: uv run asf/asf.py …)")
     return 0
 
